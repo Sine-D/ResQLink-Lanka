@@ -4,11 +4,12 @@ import { getWarningById } from "@/lib/services/warningService";
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await connectMongo();
-    const warning = await getWarningById(params.id);
+    const warning = await getWarningById(id);
 
     if (!warning) {
       return NextResponse.json({ error: "Warning record not found" }, { status: 404 });

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import MapAreaPicker from "@/components/warnings/MapAreaPicker";
 import { AlertCircle, ArrowRight, ShieldAlert, Users, Save } from "lucide-react";
-import { estimateDistrictReach } from "@/lib/services/warningService";
+import { estimateDistrictReach } from "@/lib/utils/reachEstimator";
 
 const DEFAULT_POLYGON = [
   [

@@ -4,11 +4,12 @@ import { retryWarningDispatch, WarningNotFoundError } from "@/lib/services/warni
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await connectMongo();
-    const updated = await retryWarningDispatch(params.id);
+    const updated = await retryWarningDispatch(id);
 
     return NextResponse.json({
       message: "Retry dispatch completed",

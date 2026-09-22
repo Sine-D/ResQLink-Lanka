@@ -7,13 +7,14 @@ import { v4 as uuidv4 } from "uuid";
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await req.json();
     await connectMongo();
 
-    const incident = await Incident.findOne({ incidentId: params.id });
+    const incident = await Incident.findOne({ incidentId: id });
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 });
     }
