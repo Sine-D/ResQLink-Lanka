@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "jest --coverage",
+    "seed": "npx ts-node -O \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/seed.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.103.2",
