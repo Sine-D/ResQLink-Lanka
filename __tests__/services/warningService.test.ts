@@ -64,7 +64,7 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
         save: jest.fn().mockImplementation(function (this: any) {
           const idx = mockWarningsStore.findIndex((w) => w.warningId === this.warningId);
           if (idx >= 0) {
-            mockWarningsStore[idx] = { ...this };
+            mockWarningsStore[idx] = { ...mockWarningsStore[idx], ...this };
           } else {
             mockWarningsStore.push({ ...this });
           }
@@ -84,21 +84,21 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
           then: (cb: any) => cb(null),
         };
       }
-      const wrapped = {
+      const instance = {
         ...found,
         save: jest.fn().mockImplementation(function (this: any) {
-          const idx = mockWarningsStore.findIndex((w) => w.warningId === found.warningId);
+          const idx = mockWarningsStore.findIndex((w) => w.warningId === this.warningId);
           if (idx >= 0) {
-            mockWarningsStore[idx] = { ...this, ...found };
+            mockWarningsStore[idx] = { ...mockWarningsStore[idx], ...this };
           }
-          return Promise.resolve(found);
+          return Promise.resolve(this);
         }),
         populate: jest.fn().mockResolvedValue({
           ...found,
           issuedBy: { _id: dummyUserId, name: "Officer Perera", email: "perera@dmc.gov.lk", role: "DMC_OFFICER" },
         }),
       };
-      return wrapped;
+      return instance;
     });
 
     (Warning.findById as jest.Mock).mockImplementation((id: any) => {
@@ -197,16 +197,29 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
   });
 
   test("issue() throws InvalidTargetAreaError for an unsupported/invalid district and does NOT update record beyond DRAFT", async () => {
-    const invalidInput = {
-      ...sampleInput,
-      districtName: "Unsupported_District",
-    };
+    // Manually push a draft with invalid target district into store bypassing initial create draft check
+    const draftId = "unsupported-draft-uuid";
+    mockWarningsStore.push({
+      _id: "obj_unsupported_1",
+      warningId: draftId,
+      hazardType: "Flood",
+      severity: "High",
+      status: "DRAFT",
+      targetArea: {
+        districtName: "Unsupported_District",
+        coordinates: validPolygon,
+        estimatedReach: 0,
+      },
+      instructions: "Testing unsupported district error exception flow",
+      validFrom: new Date(),
+      validUntil: new Date(Date.now() + 86400000),
+      issuedBy: dummyUserId,
+      dispatchStatus: "NOT_SENT",
+    });
 
-    const draft = await createDraft(invalidInput, dummyUserId);
+    await expect(issueWarning(draftId)).rejects.toThrow(InvalidTargetAreaError);
 
-    await expect(issueWarning(draft.warningId)).rejects.toThrow(InvalidTargetAreaError);
-
-    const stored = mockWarningsStore.find((w) => w.warningId === draft.warningId);
+    const stored = mockWarningsStore.find((w) => w.warningId === draftId);
     expect(stored?.status).toBe("DRAFT");
     expect(stored?.dispatchStatus).toBe("NOT_SENT");
   });
