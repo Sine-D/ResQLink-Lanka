@@ -20,61 +20,7 @@ The system features a **full rubric-grade implementation of Member 1's use case 
 
 ---
 
-## 🏗️ Clean Architecture & System Layering
-
-The codebase enforces a layered Clean Architecture pattern separating domain entities, business use cases, framework services, and presentation routes:
-
-```mermaid
-graph TD
-    subgraph Presentation_Layer ["🌐 Presentation & Web Layer (/src/app)"]
-        LandingPage ["Landing Page & Navbar"]
-        AuthModule ["/signin & /signup (NextAuth)"]
-        DmcDashboard ["/dmc/warnings (Active Command Dashboard)"]
-        CreateWarning ["/dmc/warnings/new (Leaflet GIS Area Picker)"]
-        ReviewScreen ["/dmc/warnings/[id]/review (Reach Estimation)"]
-        CitizenAlertFeed ["/citizen/alerts (High-Priority Alert Cards)"]
-    end
-
-    subgraph API_Layer ["⚡ REST API Route Layer (/src/app/api)"]
-        AuthApi ["/api/auth/[...nextauth] & /api/auth/signup"]
-        WarningsApi ["/api/warnings & /api/warnings/[id]"]
-        IssueApi ["/api/warnings/[id]/issue"]
-        RetryApi ["/api/warnings/[id]/retry-dispatch"]
-        TelemetryApi ["/api/telemetry (Sensor Data Stream)"]
-        StubsApi ["/api/hazard-reports | /api/incidents | /api/relief-resources"]
-    end
-
-    subgraph Domain_Core ["🏛️ Clean Core Domain (/src/core)"]
-        DomainEntities ["Domain Entities (Telemetry, DomainEvent)"]
-        RepoInterfaces ["Repository Interfaces (ITelemetryRepository)"]
-        AppServices ["Application Services & Use Cases"]
-    end
-
-    subgraph Infrastructure_Layer ["⚙️ Service & Infrastructure Layer (/lib)"]
-        WarningService ["warningService.ts (Target Validation & Reach)"]
-        NotifService ["notificationService.ts (Gateway & Retry Logic)"]
-        ZodValidation ["warningSchema.ts (Zod Validation)"]
-        ReachEstimator ["reachEstimator.ts (Population Density Matrix)"]
-    end
-
-    subgraph Database_Layer ["🗄️ Database Layer (/lib/models)"]
-        MongoConnect ["connectMongo.ts (Connection Cache)"]
-        UserCol [("Users Collection")]
-        WarningCol [("Disaster Warnings Collection")]
-        NotifCol [("Notifications Collection")]
-        TelemetryCol [("Telemetry Readings Collection")]
-    end
-
-    Presentation_Layer --> API_Layer
-    API_Layer --> Infrastructure_Layer
-    API_Layer --> Domain_Core
-    Infrastructure_Layer --> Domain_Core
-    Infrastructure_Layer --> Database_Layer
-```
-
----
-
-## 🧩 4 Core Modules Scope Breakdown
+## 🧩 Core Modules Scope Breakdown
 
 | Icon | Module Name | Scope | Key Functionalities |
 | :---: | :--- | :---: | :--- |
