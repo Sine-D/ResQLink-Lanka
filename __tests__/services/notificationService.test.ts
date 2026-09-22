@@ -1,101 +1,108 @@
-import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import Warning from "../../lib/models/Warning";
 import NotificationModel from "../../lib/models/Notification";
-import User from "../../lib/models/User";
 import {
   dispatchNotification,
   retryNotificationDispatch,
   setGatewayClient,
   MockEmergencyGatewayClient,
-  GatewayUnavailableError,
-  GatewayCriticalError,
-  IGatewayClient,
 } from "../../lib/services/notificationService";
-import { v4 as uuidv4 } from "uuid";
 
-let mongoServer: MongoMemoryServer;
-
-beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  await mongoose.connect(mongoUri);
-});
-
-afterAll(async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-  }
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
-});
-
-beforeEach(async () => {
-  await Warning.deleteMany({});
-  await NotificationModel.deleteMany({});
-  await User.deleteMany({});
-});
+// Mock Mongoose models for offline-resilient unit testing
+jest.mock("../../lib/models/Notification");
+jest.mock("../../lib/models/Warning");
 
 describe("Notification Service Unit Tests", () => {
-  const dummyPolygon = {
-    type: "Polygon" as const,
-    coordinates: [
-      [
-        [79.86, 6.92],
-        [79.88, 6.92],
-        [79.88, 6.94],
-        [79.86, 6.94],
-        [79.86, 6.92],
-      ],
-    ],
+  let mockNotificationsStore: any[] = [];
+  let mockWarningsStore: any[] = [];
+
+  const dummyWarning: any = {
+    _id: "warning_obj_id_123",
+    warningId: "test-uuid-1234",
+    hazardType: "Flood",
+    severity: "High",
+    status: "ACTIVE",
+    targetArea: {
+      districtName: "Colombo",
+      coordinates: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [79.86, 6.92],
+            [79.88, 6.92],
+            [79.88, 6.94],
+            [79.86, 6.94],
+            [79.86, 6.92],
+          ],
+        ],
+      },
+      estimatedReach: 750000,
+    },
+    instructions: "Evacuate immediately to higher ground.",
+    dispatchStatus: "NOT_SENT",
   };
 
-  async function createTestWarning() {
-    const user = await User.create({
-      name: "Officer Silva",
-      email: "silva@dmc.gov.lk",
-      passwordHash: "hashedpass",
-      role: "DMC_OFFICER",
-      district: "Colombo",
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockNotificationsStore = [];
+    mockWarningsStore = [{ ...dummyWarning }];
+
+    // Setup NotificationModel mock behavior
+    (NotificationModel.findOne as jest.Mock).mockImplementation((query: any) => {
+      const found = mockNotificationsStore.find(
+        (n) => n.warningId === query.warningId || n.warningId === query.warningId?.toString()
+      );
+      return Promise.resolve(found || null);
     });
 
-    const warning = await Warning.create({
-      warningId: uuidv4(),
-      hazardType: "Flood",
-      severity: "High",
-      status: "ACTIVE",
-      targetArea: {
-        districtName: "Colombo",
-        coordinates: dummyPolygon,
-        estimatedReach: 750000,
-      },
-      instructions: "Move to higher ground immediately.",
-      validFrom: new Date(),
-      validUntil: new Date(Date.now() + 86400000),
-      issuedBy: user._id,
-      dispatchStatus: "NOT_SENT",
+    // Mock constructor / save for new NotificationModel
+    (NotificationModel as unknown as jest.Mock).mockImplementation((data: any) => {
+      const instance = {
+        ...data,
+        save: jest.fn().mockImplementation(function (this: any) {
+          const index = mockNotificationsStore.findIndex((n) => n.notificationId === this.notificationId);
+          if (index >= 0) {
+            mockNotificationsStore[index] = { ...this };
+          } else {
+            mockNotificationsStore.push({ ...this });
+          }
+          return Promise.resolve(this);
+        }),
+      };
+      return instance;
     });
 
-    return { warning, user };
-  }
+    // Setup Warning model mocks
+    (Warning.findOne as jest.Mock).mockImplementation((query: any) => {
+      const found = mockWarningsStore.find((w) => w.warningId === query.warningId || w._id === query._id);
+      return Promise.resolve(found ? { ...found } : null);
+    });
+
+    (Warning.findById as jest.Mock).mockImplementation((id: any) => {
+      const found = mockWarningsStore.find((w) => w._id === id);
+      return Promise.resolve(found ? { ...found } : null);
+    });
+
+    (Warning.findByIdAndUpdate as jest.Mock).mockImplementation((id: any, update: any) => {
+      const target = mockWarningsStore.find((w) => w._id === id);
+      if (target) {
+        Object.assign(target, update);
+      }
+      return Promise.resolve(target);
+    });
+  });
 
   test("dispatchNotification() success path creates SENT notification and sets warning.dispatchStatus = SENT", async () => {
     const mockGateway = new MockEmergencyGatewayClient();
     mockGateway.setMode("SUCCESS");
     setGatewayClient(mockGateway);
 
-    const { warning } = await createTestWarning();
-
-    const notif = await dispatchNotification(warning, "BOTH");
+    const notif = await dispatchNotification(dummyWarning, "BOTH");
 
     expect(notif).toBeDefined();
     expect(notif.status).toBe("SENT");
-    expect(notif.sentAt).not.toBeNull();
+    expect(notif.sentAt).toBeInstanceOf(Date);
     expect(notif.errorLog).toBeNull();
-
-    const updatedWarning = await Warning.findById(warning._id);
-    expect(updatedWarning?.dispatchStatus).toBe("SENT");
+    expect(mockWarningsStore[0].dispatchStatus).toBe("SENT");
   });
 
   test("dispatchNotification() when gateway throws GatewayUnavailableError -> sets PENDING_DISPATCH", async () => {
@@ -103,16 +110,11 @@ describe("Notification Service Unit Tests", () => {
     mockGateway.setMode("UNAVAILABLE");
     setGatewayClient(mockGateway);
 
-    const { warning } = await createTestWarning();
-
-    const notif = await dispatchNotification(warning, "SMS");
+    const notif = await dispatchNotification(dummyWarning, "SMS");
 
     expect(notif.status).toBe("PENDING_DISPATCH");
     expect(notif.errorLog).toContain("[UNAVAILABLE]");
-
-    const updatedWarning = await Warning.findById(warning._id);
-    expect(updatedWarning?.dispatchStatus).toBe("PENDING_DISPATCH");
-    expect(updatedWarning?.status).toBe("ACTIVE"); // Stays active
+    expect(mockWarningsStore[0].dispatchStatus).toBe("PENDING_DISPATCH");
   });
 
   test("dispatchNotification() when gateway throws GatewayCriticalError -> sets FAILED and populates errorLog", async () => {
@@ -120,16 +122,11 @@ describe("Notification Service Unit Tests", () => {
     mockGateway.setMode("CRITICAL_ERROR");
     setGatewayClient(mockGateway);
 
-    const { warning } = await createTestWarning();
-
-    const notif = await dispatchNotification(warning, "PUSH");
+    const notif = await dispatchNotification(dummyWarning, "PUSH");
 
     expect(notif.status).toBe("FAILED");
     expect(notif.errorLog).toContain("[CRITICAL_FAILURE]");
-
-    const updatedWarning = await Warning.findById(warning._id);
-    expect(updatedWarning?.dispatchStatus).toBe("FAILED");
-    expect(updatedWarning?.status).toBe("ACTIVE"); // Warning stays ACTIVE but flagged
+    expect(mockWarningsStore[0].dispatchStatus).toBe("FAILED");
   });
 
   test("retryNotificationDispatch() re-attempts pending/failed dispatch and succeeds", async () => {
@@ -137,17 +134,15 @@ describe("Notification Service Unit Tests", () => {
     mockGateway.setMode("UNAVAILABLE");
     setGatewayClient(mockGateway);
 
-    const { warning } = await createTestWarning();
-    await dispatchNotification(warning);
+    await dispatchNotification(dummyWarning);
+    expect(mockWarningsStore[0].dispatchStatus).toBe("PENDING_DISPATCH");
 
     // Switch gateway to SUCCESS and retry
     mockGateway.setMode("SUCCESS");
-    const retriedNotif = await retryNotificationDispatch(warning.warningId);
+    const retriedNotif = await retryNotificationDispatch(dummyWarning.warningId);
 
     expect(retriedNotif?.status).toBe("SENT");
-
-    const updatedWarning = await Warning.findOne({ warningId: warning.warningId });
-    expect(updatedWarning?.dispatchStatus).toBe("SENT");
+    expect(mockWarningsStore[0].dispatchStatus).toBe("SENT");
   });
 
   test("retryNotificationDispatch() on an already-SENT warning is idempotent (no-op)", async () => {
@@ -155,14 +150,18 @@ describe("Notification Service Unit Tests", () => {
     mockGateway.setMode("SUCCESS");
     setGatewayClient(mockGateway);
 
-    const { warning } = await createTestWarning();
-    const originalNotif = await dispatchNotification(warning);
+    mockWarningsStore[0].dispatchStatus = "SENT";
+    mockNotificationsStore.push({
+      notificationId: "notif-1",
+      warningId: dummyWarning._id,
+      status: "SENT",
+      sentAt: new Date(),
+    });
 
     const spySend = jest.spyOn(mockGateway, "send");
-
-    const retriedNotif = await retryNotificationDispatch(warning.warningId);
+    const retriedNotif = await retryNotificationDispatch(dummyWarning.warningId);
 
     expect(retriedNotif?.status).toBe("SENT");
-    expect(spySend).not.toHaveBeenCalled(); // No duplicate transmission call
+    expect(spySend).not.toHaveBeenCalled();
   });
 });

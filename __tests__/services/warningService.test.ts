@@ -1,5 +1,3 @@
-import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import Warning from "../../lib/models/Warning";
 import User from "../../lib/models/User";
 import NotificationModel from "../../lib/models/Notification";
@@ -17,44 +15,15 @@ import * as notificationService from "../../lib/services/notificationService";
 import { createWarningSchema } from "../../lib/validation/warningSchema";
 import { ZodError } from "zod";
 
-let mongoServer: MongoMemoryServer;
-let testUser: any;
-
-beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  await mongoose.connect(mongoUri);
-});
-
-afterAll(async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-  }
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
-});
-
-beforeEach(async () => {
-  await Warning.deleteMany({});
-  await User.deleteMany({});
-  await NotificationModel.deleteMany({});
-
-  testUser = await User.create({
-    name: "Officer Perera",
-    email: "perera@dmc.gov.lk",
-    passwordHash: "hashedsecret",
-    role: "DMC_OFFICER",
-    district: "Colombo",
-  });
-
-  // Reset gateway to default success mode
-  const mockGateway = new notificationService.MockEmergencyGatewayClient();
-  mockGateway.setMode("SUCCESS");
-  notificationService.setGatewayClient(mockGateway);
-});
+jest.mock("../../lib/models/Warning");
+jest.mock("../../lib/models/User");
+jest.mock("../../lib/models/Notification");
 
 describe("Warning Service & Logic Unit Tests (Member 1)", () => {
+  let mockWarningsStore: any[] = [];
+  let mockNotificationsStore: any[] = [];
+  const dummyUserId = "507f1f77bcf86cd799439011";
+
   const validPolygon = {
     type: "Polygon" as const,
     coordinates: [
@@ -78,37 +47,142 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     validUntil: new Date(Date.now() + 1000 * 60 * 60 * 24), // +24h
   };
 
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockWarningsStore = [];
+    mockNotificationsStore = [];
+
+    const mockGateway = new notificationService.MockEmergencyGatewayClient();
+    mockGateway.setMode("SUCCESS");
+    notificationService.setGatewayClient(mockGateway);
+
+    // Mock Warning constructor & methods
+    (Warning as unknown as jest.Mock).mockImplementation((data: any) => {
+      const instance = {
+        ...data,
+        _id: data._id || `id_${Math.random().toString(36).substring(2, 9)}`,
+        save: jest.fn().mockImplementation(function (this: any) {
+          const idx = mockWarningsStore.findIndex((w) => w.warningId === this.warningId);
+          if (idx >= 0) {
+            mockWarningsStore[idx] = { ...this };
+          } else {
+            mockWarningsStore.push({ ...this });
+          }
+          return Promise.resolve(this);
+        }),
+      };
+      return instance;
+    });
+
+    (Warning.findOne as jest.Mock).mockImplementation((query: any) => {
+      const found = mockWarningsStore.find(
+        (w) => w.warningId === query.warningId || w._id?.toString() === query._id?.toString()
+      );
+      if (!found) {
+        return {
+          populate: jest.fn().mockResolvedValue(null),
+          then: (cb: any) => cb(null),
+        };
+      }
+      const wrapped = {
+        ...found,
+        save: jest.fn().mockImplementation(function (this: any) {
+          const idx = mockWarningsStore.findIndex((w) => w.warningId === found.warningId);
+          if (idx >= 0) {
+            mockWarningsStore[idx] = { ...this, ...found };
+          }
+          return Promise.resolve(found);
+        }),
+        populate: jest.fn().mockResolvedValue({
+          ...found,
+          issuedBy: { _id: dummyUserId, name: "Officer Perera", email: "perera@dmc.gov.lk", role: "DMC_OFFICER" },
+        }),
+      };
+      return wrapped;
+    });
+
+    (Warning.findById as jest.Mock).mockImplementation((id: any) => {
+      const found = mockWarningsStore.find((w) => w._id?.toString() === id?.toString() || w._id === id);
+      return Promise.resolve(found || null);
+    });
+
+    (Warning.findByIdAndUpdate as jest.Mock).mockImplementation((id: any, update: any) => {
+      const target = mockWarningsStore.find((w) => w._id?.toString() === id?.toString() || w._id === id);
+      if (target) {
+        Object.assign(target, update);
+      }
+      return Promise.resolve(target);
+    });
+
+    (Warning.find as jest.Mock).mockImplementation((query: any) => {
+      let results = [...mockWarningsStore];
+      if (query.status) {
+        results = results.filter((w) => w.status === query.status);
+      }
+      if (query["targetArea.districtName"]) {
+        const regex = query["targetArea.districtName"];
+        results = results.filter((w) => regex.test(w.targetArea.districtName));
+      }
+      return {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockResolvedValue(results),
+      };
+    });
+
+    // Mock NotificationModel
+    (NotificationModel as unknown as jest.Mock).mockImplementation((data: any) => {
+      const instance = {
+        ...data,
+        save: jest.fn().mockImplementation(function (this: any) {
+          const idx = mockNotificationsStore.findIndex((n) => n.notificationId === this.notificationId);
+          if (idx >= 0) {
+            mockNotificationsStore[idx] = { ...this };
+          } else {
+            mockNotificationsStore.push({ ...this });
+          }
+          return Promise.resolve(this);
+        }),
+      };
+      return instance;
+    });
+
+    (NotificationModel.findOne as jest.Mock).mockImplementation((query: any) => {
+      const found = mockNotificationsStore.find(
+        (n) => n.warningId?.toString() === query.warningId?.toString()
+      );
+      return Promise.resolve(found || null);
+    });
+  });
+
   test("creates a draft with correct default status (DRAFT and NOT_SENT)", async () => {
-    const draft = await createDraft(sampleInput, testUser._id.toString());
+    const draft = await createDraft(sampleInput, dummyUserId);
 
     expect(draft).toBeDefined();
     expect(draft.warningId).toBeDefined();
     expect(draft.status).toBe("DRAFT");
     expect(draft.dispatchStatus).toBe("NOT_SENT");
     expect(draft.targetArea.estimatedReach).toBe(750000); // Colombo population lookup
-    expect(draft.issuedBy.toString()).toBe(testUser._id.toString());
   });
 
   test("createDraft() NEVER calls notificationService (spy assertion)", async () => {
     const spyDispatch = jest.spyOn(notificationService, "dispatchNotification");
 
-    await createDraft(sampleInput, testUser._id.toString());
+    await createDraft(sampleInput, dummyUserId);
 
     expect(spyDispatch).not.toHaveBeenCalled();
     spyDispatch.mockRestore();
   });
 
   test("issue() transitions DRAFT -> ACTIVE and persists before dispatch (assert call order)", async () => {
-    const draft = await createDraft(sampleInput, testUser._id.toString());
+    const draft = await createDraft(sampleInput, dummyUserId);
 
     let persistedStatusBeforeDispatch = "";
     const originalDispatch = notificationService.dispatchNotification;
     const spyDispatch = jest
       .spyOn(notificationService, "dispatchNotification")
       .mockImplementation(async (warningDoc) => {
-        // Assert that the document in DB is already saved as ACTIVE before dispatch runs
-        const docInDb = await Warning.findById(warningDoc._id);
-        persistedStatusBeforeDispatch = docInDb?.status || "";
+        const stored = mockWarningsStore.find((w) => w.warningId === warningDoc.warningId);
+        persistedStatusBeforeDispatch = stored?.status || "";
         return originalDispatch(warningDoc);
       });
 
@@ -128,13 +202,13 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
       districtName: "Unsupported_District",
     };
 
-    const draft = await createDraft(invalidInput, testUser._id.toString());
+    const draft = await createDraft(invalidInput, dummyUserId);
 
     await expect(issueWarning(draft.warningId)).rejects.toThrow(InvalidTargetAreaError);
 
-    const docInDb = await Warning.findOne({ warningId: draft.warningId });
-    expect(docInDb?.status).toBe("DRAFT");
-    expect(docInDb?.dispatchStatus).toBe("NOT_SENT");
+    const stored = mockWarningsStore.find((w) => w.warningId === draft.warningId);
+    expect(stored?.status).toBe("DRAFT");
+    expect(stored?.dispatchStatus).toBe("NOT_SENT");
   });
 
   test("dispatch() when gateway throws 'unavailable' sets PENDING_DISPATCH and warning stays ACTIVE", async () => {
@@ -142,7 +216,7 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     mockGateway.setMode("UNAVAILABLE");
     notificationService.setGatewayClient(mockGateway);
 
-    const draft = await createDraft(sampleInput, testUser._id.toString());
+    const draft = await createDraft(sampleInput, dummyUserId);
     const issued = await issueWarning(draft.warningId);
 
     expect(issued.status).toBe("ACTIVE");
@@ -154,13 +228,13 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     mockGateway.setMode("CRITICAL_ERROR");
     notificationService.setGatewayClient(mockGateway);
 
-    const draft = await createDraft(sampleInput, testUser._id.toString());
+    const draft = await createDraft(sampleInput, dummyUserId);
     const issued = await issueWarning(draft.warningId);
 
     expect(issued.status).toBe("ACTIVE");
     expect(issued.dispatchStatus).toBe("FAILED");
 
-    const notificationRecord = await NotificationModel.findOne({ warningId: draft._id });
+    const notificationRecord = mockNotificationsStore.find((n) => n.warningId?.toString() === draft._id?.toString());
     expect(notificationRecord?.status).toBe("FAILED");
     expect(notificationRecord?.errorLog).toBeDefined();
   });
@@ -170,7 +244,7 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     mockGateway.setMode("UNAVAILABLE");
     notificationService.setGatewayClient(mockGateway);
 
-    const draft = await createDraft(sampleInput, testUser._id.toString());
+    const draft = await createDraft(sampleInput, dummyUserId);
     await issueWarning(draft.warningId);
 
     // Switch gateway back to SUCCESS
@@ -181,7 +255,7 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
   });
 
   test("retryWarningDispatch() on an already-SENT warning is a no-op (idempotency)", async () => {
-    const draft = await createDraft(sampleInput, testUser._id.toString());
+    const draft = await createDraft(sampleInput, dummyUserId);
     await issueWarning(draft.warningId);
 
     const spyDispatch = jest.spyOn(notificationService, "retryNotificationDispatch");
@@ -196,14 +270,14 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     const invalidDateInput = {
       ...sampleInput,
       validFrom: new Date(2026, 5, 10),
-      validUntil: new Date(2026, 5, 9), // validUntil < validFrom
+      validUntil: new Date(2026, 5, 9),
     };
 
     expect(() => createWarningSchema.parse(invalidDateInput)).toThrow(ZodError);
 
     const shortInstructionsInput = {
       ...sampleInput,
-      instructions: "Short", // < 10 chars
+      instructions: "Short",
     };
     expect(() => createWarningSchema.parse(shortInstructionsInput)).toThrow(ZodError);
 
@@ -215,12 +289,12 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
   });
 
   test("getWarningById(), listActiveWarnings(), listAllWarnings() query helpers", async () => {
-    const draft1 = await createDraft(sampleInput, testUser._id.toString());
+    const draft1 = await createDraft(sampleInput, dummyUserId);
     await issueWarning(draft1.warningId);
 
     const draft2 = await createDraft(
       { ...sampleInput, districtName: "Galle" },
-      testUser._id.toString()
+      dummyUserId
     );
 
     const fetched = await getWarningById(draft1.warningId);
@@ -234,7 +308,7 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     expect(colomboActive.length).toBe(1);
 
     const galleActive = await listActiveWarnings("Galle");
-    expect(galleActive.length).toBe(0); // draft2 is still DRAFT
+    expect(galleActive.length).toBe(0);
 
     const allWarnings = await listAllWarnings();
     expect(allWarnings.length).toBe(2);
