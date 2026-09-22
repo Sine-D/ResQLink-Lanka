@@ -7,7 +7,7 @@
 [![Jest Coverage](https://img.shields.io/badge/Jest_Coverage-95.23%25-brightgreen?style=for-the-badge&logo=jest)](https://jestjs.io/)
 [![NextAuth.js](https://img.shields.io/badge/Auth-NextAuth.js-purple?style=for-the-badge&logo=next.js)](https://next-auth.js.org/)
 
-> **SE3070 Coursework Assignment A02 Deliverable**  
+
 > A national-level Smart Disaster Early-Warning and Emergency Coordination Platform tailored for Sri Lanka's Disaster Management Center (DMC), District Secretariats, Rescue Squads, and Citizens.
 
 ---

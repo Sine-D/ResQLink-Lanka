@@ -4,11 +4,12 @@ import { issueWarning, InvalidTargetAreaError, WarningNotFoundError } from "@/li
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await connectMongo();
-    const issuedWarning = await issueWarning(params.id);
+    const issuedWarning = await issueWarning(id);
 
     return NextResponse.json({
       message: "Warning issued and dispatched successfully",
