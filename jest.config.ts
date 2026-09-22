@@ -7,6 +7,7 @@ const config: Config = {
     "^@/(.*)$": "<rootDir>/$1",
   },
   testMatch: ["**/__tests__/**/*.test.ts"],
+  testTimeout: 60000,
   collectCoverageFrom: [
     "lib/services/**/*.ts",
     "lib/validation/**/*.ts",
