@@ -327,6 +327,16 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     expect(allWarnings.length).toBe(2);
   });
 
+  test("validateTargetArea() throws for empty district name and polygon with less than 4 points", () => {
+    expect(() => validateTargetArea("", validPolygon.coordinates)).toThrow(InvalidTargetAreaError);
+    expect(() => validateTargetArea("Colombo", [])).toThrow(InvalidTargetAreaError);
+  });
+
+  test("estimateDistrictReach() returns default fallback for unmapped district names", () => {
+    const fallbackReach = estimateDistrictReach("UnknownRandomDistrictName");
+    expect(fallbackReach).toBe(150000);
+  });
+
   test("issueWarning() throws WarningNotFoundError for non-existent UUID", async () => {
     await expect(issueWarning("non-existent-uuid")).rejects.toThrow(WarningNotFoundError);
   });
