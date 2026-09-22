@@ -163,5 +163,12 @@ describe("Notification Service Unit Tests", () => {
 
     expect(retriedNotif?.status).toBe("SENT");
     expect(spySend).not.toHaveBeenCalled();
+    spySend.mockRestore();
+  });
+
+  test("retryNotificationDispatch() throws error for non-existent warning ID", async () => {
+    await expect(retryNotificationDispatch("non-existent-warning-id")).rejects.toThrow(
+      "Warning with ID non-existent-warning-id not found"
+    );
   });
 });
