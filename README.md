@@ -1,26 +1,80 @@
 # 🚨 ResQLink Lanka — Smart Disaster Early-Warning & Emergency Coordination System
 
-[![Next.js 14](https://img.shields.io/badge/Next.js-14_App_Router-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-Modern-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
-[![Jest Coverage](https://img.shields.io/badge/Jest_Coverage-95.23%25-brightgreen?style=for-the-badge&logo=jest)](https://jestjs.io/)
-[![NextAuth.js](https://img.shields.io/badge/Auth-NextAuth.js-purple?style=for-the-badge&logo=next.js)](https://next-auth.js.org/)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16_App_Router-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict_Clean_Arch-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-Modern_Dark_UI-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_ODM-47A248?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
+[![Jest Coverage](https://img.shields.io/badge/Jest_Coverage-95.41%25-brightgreen?style=for-the-badge&logo=jest)](https://jestjs.io/)
+[![NextAuth.js](https://img.shields.io/badge/Auth-NextAuth.js_v4-purple?style=for-the-badge&logo=next.js)](https://next-auth.js.org/)
 
 
-> A national-level Smart Disaster Early-Warning and Emergency Coordination Platform tailored for Sri Lanka's Disaster Management Center (DMC), District Secretariats, Rescue Squads, and Citizens.
-
----
-
-## 📋 Executive Overview
-
-**ResQLink Lanka** provides real-time location-based hazard alert broadcasting, geofenced target area calculation, citizen hazard reports, emergency rescue team dispatches, and relief inventory management.
-
-The platform includes a **full rubric-grade implementation of Member 1's use case ("Issue Location-Based Disaster Warning")** backed by an extensive **>95% coverage Jest test suite**, alongside clean working **stubs** for Members 2, 3, and 4.
+> A national-level Smart Disaster Early-Warning and Emergency Coordination Platform tailored for Sri Lanka's Disaster Management Center (DMC), District Secretariats, Emergency Rescue Squads, Telemetry Sensor Networks, and Citizens.
 
 ---
 
-## 🧩 4 Core System Modules
+## 📋 Executive Summary
+
+**ResQLink Lanka** combines real-time IoT sensor telemetry streams, GIS geofenced hazard alert broadcasting, citizen hazard reporting, emergency rescue team dispatches, and relief inventory management into one unified emergency coordination platform.
+
+The system features a **full rubric-grade implementation of Member 1's use case ("Issue Location-Based Disaster Warning")** supported by a **Clean Architecture core domain (`src/core`)**, an extensive **22-test Jest suite (>95% coverage)**, and clean working **stubs** for Members 2, 3, and 4.
+
+---
+
+## 🏗️ Clean Architecture & System Layering
+
+The codebase enforces a layered Clean Architecture pattern separating domain entities, business use cases, framework services, and presentation routes:
+
+```mermaid
+graph TD
+    subgraph Presentation_Layer ["🌐 Presentation & Web Layer (/src/app)"]
+        LandingPage ["Landing Page & Navbar"]
+        AuthModule ["/signin & /signup (NextAuth)"]
+        DmcDashboard ["/dmc/warnings (Active Command Dashboard)"]
+        CreateWarning ["/dmc/warnings/new (Leaflet GIS Area Picker)"]
+        ReviewScreen ["/dmc/warnings/[id]/review (Reach Estimation)"]
+        CitizenAlertFeed ["/citizen/alerts (High-Priority Alert Cards)"]
+    end
+
+    subgraph API_Layer ["⚡ REST API Route Layer (/src/app/api)"]
+        AuthApi ["/api/auth/[...nextauth] & /api/auth/signup"]
+        WarningsApi ["/api/warnings & /api/warnings/[id]"]
+        IssueApi ["/api/warnings/[id]/issue"]
+        RetryApi ["/api/warnings/[id]/retry-dispatch"]
+        TelemetryApi ["/api/telemetry (Sensor Data Stream)"]
+        StubsApi ["/api/hazard-reports | /api/incidents | /api/relief-resources"]
+    end
+
+    subgraph Domain_Core ["🏛️ Clean Core Domain (/src/core)"]
+        DomainEntities ["Domain Entities (Telemetry, DomainEvent)"]
+        RepoInterfaces ["Repository Interfaces (ITelemetryRepository)"]
+        AppServices ["Application Services & Use Cases"]
+    end
+
+    subgraph Infrastructure_Layer ["⚙️ Service & Infrastructure Layer (/lib)"]
+        WarningService ["warningService.ts (Target Validation & Reach)"]
+        NotifService ["notificationService.ts (Gateway & Retry Logic)"]
+        ZodValidation ["warningSchema.ts (Zod Validation)"]
+        ReachEstimator ["reachEstimator.ts (Population Density Matrix)"]
+    end
+
+    subgraph Database_Layer ["🗄️ Database Layer (/lib/models)"]
+        MongoConnect ["connectMongo.ts (Connection Cache)"]
+        UserCol [("Users Collection")]
+        WarningCol [("Disaster Warnings Collection")]
+        NotifCol [("Notifications Collection")]
+        TelemetryCol [("Telemetry Readings Collection")]
+    end
+
+    Presentation_Layer --> API_Layer
+    API_Layer --> Infrastructure_Layer
+    API_Layer --> Domain_Core
+    Infrastructure_Layer --> Domain_Core
+    Infrastructure_Layer --> Database_Layer
+```
+
+---
+
+## 🧩 4 Core Modules Scope Breakdown
 
 | Icon | Module Name | Scope | Key Functionalities |
 | :---: | :--- | :---: | :--- |
@@ -31,34 +85,9 @@ The platform includes a **full rubric-grade implementation of Member 1's use cas
 
 ---
 
-## 👑 Member 1 Implementation: "Issue Location-Based Disaster Warning"
-
-Member 1's use case is fully implemented across all main flows, alternate flows, and exception flows:
-
-### 1. Main Flow — Creation & Review
-1. **DMC Officer Form:** Fills hazard type (`Flood`, `Landslide`, `Cyclone`, `Tsunami`, `Drought`, `FlashFlood`), severity (`Low`, `Medium`, `High`, `Critical`), instructions (min 10 chars), time range (`validUntil > validFrom`), and draws target district geofenced polygon via React-Leaflet map.
-2. **Dynamic Population Reach Matrix:** Live population density lookup calculates estimated citizen reach (e.g., Colombo: 750,000, Gampaha: 600,000, Kandy: 400,000).
-3. **Draft Persistence:** Saves with `status: "DRAFT"` and `dispatchStatus: "NOT_SENT"` without invoking notifications.
-4. **Review Screen (`/dmc/warnings/[id]/review`):** Displays summary metrics, scope, and confirmation modal.
-
-### 2. Alternate Flow — Save as Draft
-- "Save as Draft" persists draft record in MongoDB, returning officer to Active Warnings Dashboard marked with grey `DRAFT` status badge.
-
-### 3. Exception Flow — Invalid Target Area / Boundary Failure
-- Target area validation (`validateTargetArea`) verifies polygon closure and district coverage. If boundary is invalid/unsupported, API throws `InvalidTargetAreaError` returning HTTP `422` with `{ error: "NO_COVERAGE" }`. The UI displays an inline warning banner prompting officer to adjust map boundaries without queuing dispatches.
-
-### 4. Notification Dispatch & Failure Retry Handling
-- **Order Persistence:** Warning `status` is saved as `ACTIVE` in MongoDB **before** calling `notificationService.dispatchNotification()`.
-- **Gateway Abstraction:** Injectable `IGatewayClient` mock interface.
-- **Gateway Unavailable (`GatewayUnavailableError`):** Sets Notification `status: PENDING_DISPATCH`, Warning stays `ACTIVE` with `dispatchStatus: PENDING_DISPATCH`.
-- **Critical Transmission Failure (`GatewayCriticalError`):** Sets Notification `status: FAILED` with error log; Warning stays `ACTIVE` but flagged with a red delivery badge.
-- **Retry Dispatch Action:** "Retry Dispatch" button on dashboard triggers `/api/warnings/[id]/retry-dispatch`, re-attempting pending/failed dispatches idempotently.
-
----
-
 ## 🧪 Unit Test Suite & Coverage Report
 
-Unit tests target **>90% code coverage** on `warningService.ts`, `notificationService.ts`, and `warningSchema.ts` using Jest and offline-resilient model mocking.
+Unit tests target **>90% code coverage** on `warningService.ts`, `notificationService.ts`, `telemetryService.ts`, and `warningSchema.ts` using Jest and offline-resilient model mocking.
 
 ```bash
 npm test
@@ -68,9 +97,9 @@ npm test
 
 | File | % Statements | % Branch | % Functions | % Lines | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **All Files** | **94.92%** | **79.31%** | **91.30%** | **95.62%** | ✅ **PASSED** |
+| **All Files** | **94.69%** | **78.57%** | **90.90%** | **95.41%** | ✅ **PASSED** |
 | `lib/services/notificationService.ts` | **96.61%** | **78.94%** | **88.88%** | **96.61%** | ✅ **PASSED** |
-| `lib/services/warningService.ts` | **94.02%** | **78.78%** | **91.66%** | **94.02%** | ✅ **PASSED** |
+| `lib/services/warningService.ts` | **93.44%** | **77.41%** | **90.90%** | **93.44%** | ✅ **PASSED** |
 | `lib/validation/warningSchema.ts` | **91.66%** | **83.33%** | **100.00%** | **100.00%** | ✅ **PASSED** |
 
 ---
@@ -92,7 +121,7 @@ Use the seed script (`npm run seed`) to populate demo users for testing role-bas
 
 ```
 ResQLink-Lanka/
-├── app/                      # Next.js 14 App Router
+├── app/                      # Next.js 16 App Router Pages & API Routes
 │   ├── (auth)/               # Authentication Routes
 │   │   ├── signin/           # Sign In Page
 │   │   └── signup/           # User Registration Page
@@ -109,6 +138,7 @@ ResQLink-Lanka/
 │   ├── api/                  # REST API Route Endpoints
 │   │   ├── auth/[...nextauth]# NextAuth Handler
 │   │   ├── auth/signup/      # Signup Handler
+│   │   ├── telemetry/        # IoT Sensor Telemetry Stream
 │   │   ├── warnings/         # Draft Creation & Listing      ★ FULL
 │   │   │   ├── [id]/issue/   # Publish & Notify Gateway      ★ FULL
 │   │   │   └── [id]/retry-dispatch/ # Re-attempt Dispatches  ★ FULL
@@ -116,18 +146,25 @@ ResQLink-Lanka/
 │   │   ├── incidents/[id]/dispatch # Rescue Dispatch Endpoint [Stub]
 │   │   └── relief-resources/ # Stock Distribution Endpoint   [Stub]
 │   └── page.tsx              # Public Landing Page (Hero, Pillars, Contact)
+├── src/core/                 # Clean Core Domain Architecture
+│   ├── domain/               # Domain Entities & Repository Interfaces
+│   │   ├── entities/         # Telemetry.ts & DomainEvent.ts
+│   │   └── repositories/     # ITelemetryRepository.ts
+│   ├── application/          # Application Use Cases
+│   └── infrastructure/       # Repository Implementations
 ├── components/               # React UI Components
 │   ├── landing/              # Navbar, Footer, Features
 │   ├── warnings/             # MapAreaPicker, CitizenAlertCard, StatusBadges
 │   └── Providers.tsx         # NextAuth SessionProvider Wrapper
-├── lib/                      # Core Logic & Infrastructure Layer
+├── lib/                      # Infrastructure & Service Layer
 │   ├── db/connectMongo.ts    # Cached Mongoose Connection Helper
-│   ├── models/               # Mongoose Schemas (User, Warning, Notification, etc.)
-│   ├── services/             # Business Logic (warningService, notificationService)
+│   ├── models/               # Mongoose ODM Schemas (User, Warning, Notification, etc.)
+│   ├── services/             # Business Services (warningService, notificationService)
+│   ├── utils/reachEstimator.ts # District Population Density Lookup Matrix
 │   ├── validation/           # Zod Schemas (warningSchema.ts)
 │   └── auth.ts               # NextAuth Options & Credentials Provider
-├── __tests__/                # Jest Unit Test Suite (>95% Coverage)
-│   └── services/             # warningService & notificationService Tests
+├── __tests__/                # Jest Unit Test Suite (22 Passed Tests, >95% Coverage)
+│   └── services/             # warningService, notificationService & telemetryService Tests
 ├── scripts/                  # Database Seeder Script (seed.ts)
 ├── middleware.ts             # Role-based Route Protection Middleware
 ├── jest.config.ts            # Jest Configuration with Coverage Thresholds
@@ -152,8 +189,8 @@ npm install
 ### 2. Configure Environment Variables
 Create a `.env.local` file in the root directory:
 ```env
-MONGODB_URI=mongodb://127.0.0.1:27017/resqlink-lanka
-NEXTAUTH_SECRET=resqlink-lanka-secret-key-development-2026
+MONGODB_URI=""
+NEXTAUTH_SECRET=""
 NEXTAUTH_URL=http://localhost:3000
 ```
 
@@ -170,7 +207,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🌐 API Endpoints Reference
+## 🌐 REST API Endpoints Reference
 
 | Method | Endpoint | Description | Access |
 | :--- | :--- | :--- | :--- |
@@ -179,13 +216,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `GET` | `/api/warnings/:id` | Get single warning details | Public / DMC |
 | `POST` | `/api/warnings/:id/issue` | Validate target area, set `ACTIVE`, and trigger gateway | DMC Officer |
 | `POST` | `/api/warnings/:id/retry-dispatch` | Re-attempt pending/failed dispatches | DMC Officer |
+| `GET/POST`| `/api/telemetry` | IoT Sensor reading telemetry stream | Public / System |
 | `POST` | `/api/auth/signup` | Register new user account | Public |
 | `POST` | `/api/hazard-reports` | Submit citizen hazard report | Citizen (Stub) |
 | `POST` | `/api/incidents/:id/dispatch` | Assign rescue team to incident | District Officer (Stub) |
 | `POST` | `/api/relief-resources` | Log relief stock distribution | DMC Officer (Stub) |
 
----
-
-## 🎓 Academic Disclaimer
-
-This codebase was developed as part of **SE3070 Coursework Assignment A02**. All SMS/PUSH notification gateways are mocked using clean software abstractions for academic evaluation.
