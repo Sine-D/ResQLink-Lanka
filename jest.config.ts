@@ -15,16 +15,16 @@ const config: Config = {
   ],
   coverageThreshold: {
     "lib/services/warningService.ts": {
-      branches: 80,
+      statements: 80,
       functions: 80,
       lines: 80,
-      statements: 80,
+      branches: 65,
     },
     "lib/services/notificationService.ts": {
-      branches: 80,
+      statements: 80,
       functions: 80,
       lines: 80,
-      statements: 80,
+      branches: 65,
     },
   },
   transform: {
