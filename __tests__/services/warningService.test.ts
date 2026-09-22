@@ -30,11 +30,11 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     type: "Polygon" as const,
     coordinates: [
       [
-        [79.86, 6.92],
-        [79.88, 6.92],
-        [79.88, 6.94],
-        [79.86, 6.94],
-        [79.86, 6.92],
+        [79.86, 6.92] as [number, number],
+        [79.88, 6.92] as [number, number],
+        [79.88, 6.94] as [number, number],
+        [79.86, 6.94] as [number, number],
+        [79.86, 6.92] as [number, number],
       ],
     ],
   };

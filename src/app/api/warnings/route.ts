@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     if (err instanceof ZodError) {
       return NextResponse.json(
-        { error: "VALIDATION_ERROR", message: err.errors[0].message, details: err.errors },
+        { error: "VALIDATION_ERROR", message: err.issues[0].message, details: err.issues },
         { status: 422 }
       );
     }
