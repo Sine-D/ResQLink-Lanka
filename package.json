@@ -42,6 +42,7 @@
     "mongodb-memory-server": "^11.3.0",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.12",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }
