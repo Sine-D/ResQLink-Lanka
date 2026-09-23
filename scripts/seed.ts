@@ -1,3 +1,4 @@
+import { loadEnvConfig } from "@next/env";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import User from "../lib/models/User";
@@ -8,11 +9,20 @@ import RescueTeam from "../lib/models/RescueTeam";
 import Incident from "../lib/models/Incident";
 import { v4 as uuidv4 } from "uuid";
 
-const MONGODB_URI = process.env.MONGODB_URI || "[Enter your mongoDB URI]";
+// Load environment variables from .env / .env.local
+loadEnvConfig(process.cwd());
+
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI || MONGODB_URI.includes("[Enter")) {
+  console.error("❌ ERROR: MONGODB_URI environment variable is missing in .env!");
+  console.error("Please add MONGODB_URI=\"your-mongodb-connection-string\" to your .env file.");
+  process.exit(1);
+}
 
 async function seed() {
   console.log("Connecting to MongoDB for seeding...");
-  await mongoose.connect(MONGODB_URI);
+  await mongoose.connect(MONGODB_URI!);
 
   await User.deleteMany({});
   await Warning.deleteMany({});

@@ -14,14 +14,20 @@ export async function GET() {
   }
 }
 
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    const reporterId = session?.user ? (session.user as { id: string }).id : undefined;
+
     const body = await req.json();
     await connectMongo();
 
     const report = await HazardReport.create({
       reportId: uuidv4(),
-      reporterId: body.reporterId || "507f1f77bcf86cd799439011",
+      reporterId: reporterId || body.reporterId,
       hazardType: body.hazardType || "Flood",
       locationName: body.locationName || "Colombo Fort",
       coordinates: body.coordinates || { latitude: 6.9271, longitude: 79.8612 },

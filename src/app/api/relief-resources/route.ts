@@ -15,8 +15,23 @@ export async function GET() {
   }
 }
 
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized: Authentication required" }, { status: 401 });
+    }
+
+    const userRole = (session.user as { role?: string }).role;
+    if (userRole !== "DMC_OFFICER" && userRole !== "DISTRICT_OFFICER") {
+      return NextResponse.json({ error: "Forbidden: Officer authorization required" }, { status: 403 });
+    }
+
+    const officerId = (session.user as { id: string }).id;
+
     const body = await req.json();
     await connectMongo();
 
@@ -40,7 +55,7 @@ export async function POST(req: Request) {
       centerName: body.centerName || "Central Relief Hub",
       distributedQuantity: deductQty,
       beneficiariesCount: body.beneficiariesCount || deductQty * 2,
-      officerInCharge: body.officerId || "507f1f77bcf86cd799439011",
+      officerInCharge: officerId,
       notes: body.notes || "Emergency distribution log",
     });
 
