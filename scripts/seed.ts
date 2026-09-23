@@ -8,7 +8,7 @@ import RescueTeam from "../lib/models/RescueTeam";
 import Incident from "../lib/models/Incident";
 import { v4 as uuidv4 } from "uuid";
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://sineth1211_db_user:k9fw0xB3ueQqSxYm@cluster0.ttdskui.mongodb.net/ResQLink-Lanka?appName=Cluster0";
+const MONGODB_URI = process.env.MONGODB_URI || "[Enter your mongoDB URI]";
 
 async function seed() {
   console.log("Connecting to MongoDB for seeding...");
