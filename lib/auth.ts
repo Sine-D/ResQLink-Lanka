@@ -4,6 +4,17 @@ import connectMongo from "./db/connectMongo";
 import User, { UserRole } from "./models/User";
 import bcrypt from "bcryptjs";
 
+const getNextAuthSecret = (): string => {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("CRITICAL SECURITY ERROR: NEXTAUTH_SECRET environment variable must be set in production!");
+    }
+    return "resqlink-lanka-secret-key-development-2026";
+  }
+  return secret;
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -19,14 +30,14 @@ export const authOptions: NextAuthOptions = {
 
         await connectMongo();
 
-        const user = await User.findOne({ email: credentials.email.toLowerCase() });
+        const user = await User.findOne({ email: credentials.email.toLowerCase().trim() });
         if (!user) {
-          throw new Error("No account found with this email");
+          throw new Error("Invalid credentials");
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!isValid) {
-          throw new Error("Invalid password");
+          throw new Error("Invalid credentials");
         }
 
         return {
@@ -65,7 +76,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/signin",
     error: "/signin",
   },
-  secret: process.env.NEXTAUTH_SECRET || "resqlink-lanka-secret-key-development-2026",
+  secret: getNextAuthSecret(),
 };
 
 export default NextAuth(authOptions);

@@ -4,9 +4,15 @@ import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const secret =
+    process.env.NEXTAUTH_SECRET ||
+    (process.env.NODE_ENV !== "production"
+      ? "resqlink-lanka-secret-key-development-2026"
+      : undefined);
+
   const token = await getToken({
     req,
-    secret: process.env.NEXTAUTH_SECRET || "resqlink-lanka-secret-key-development-2026",
+    secret,
   });
 
   const isAuthPage = pathname.startsWith("/signin") || pathname.startsWith("/signup");

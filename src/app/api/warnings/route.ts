@@ -28,7 +28,16 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = session?.user ? (session.user as { id: string }).id : "507f1f77bcf86cd799439011";
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized: Authentication required" }, { status: 401 });
+    }
+
+    const userRole = (session.user as { role?: string }).role;
+    if (userRole !== "DMC_OFFICER") {
+      return NextResponse.json({ error: "Forbidden: Only DMC Officers can create warning drafts" }, { status: 403 });
+    }
+
+    const userId = (session.user as { id: string }).id;
 
     const body = await req.json();
     await connectMongo();
