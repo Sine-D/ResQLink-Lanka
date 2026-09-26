@@ -1,0 +1,13 @@
+.control {
+  background-color: #020617;
+  color: #ffffff;
+}
+
+.control::placeholder {
+  color: #475569;
+}
+
+.control option {
+  background-color: #020617;
+  color: #ffffff;
+}
