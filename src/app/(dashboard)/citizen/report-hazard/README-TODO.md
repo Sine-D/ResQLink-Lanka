@@ -2,8 +2,12 @@
 
 The basic scaffold for Member 2 is created (Mongoose model `HazardReport`, route `/citizen/report-hazard`, DMC verification route `/dmc/hazard-reports`, and API `POST /api/hazard-reports`).
 
-## Open Flows to Implement for Rubric Completion:
-1. **Offline Queue & Sync:** Implement IndexedDB or localStorage offline queue per use case scenario when network connection drops.
-2. **Photo Upload & Compression:** Add photo attachment preview and S3 / Cloudinary image upload.
-3. **Verification Workflow:** DMC Officer verify/reject actions updating report status to `VERIFIED` or `REJECTED`.
-4. **Unit Tests:** Add Jest unit test suite for `hazardReportService.ts`.
+## Implemented Flows
+1. **Offline Queue & Sync:** IndexedDB queue, Pending Synchronization UI, automatic online retry, and idempotent server synchronization.
+2. **Photo Capture & Upload:** Mobile camera/file capture with type and size validation; evidence is stored with the report.
+3. **Verification Workflow:** DMC-only verify/reject actions, rejection reasons, officer ID, and decision timestamps.
+4. **Citizen Tracking:** Citizens can view Pending Verification, Verified, Rejected, and locally queued reports.
+5. **Unit Tests:** Jest coverage for hazard report lookup, verification, rejection, and audit fields.
+
+## Future Production Enhancement
+- Move base64 evidence images from MongoDB to managed object storage such as S3 or Cloudinary for production-scale storage and delivery.

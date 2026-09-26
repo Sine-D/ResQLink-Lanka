@@ -1,95 +1,46 @@
-"use client";
+import HazardForm from "@/components/hazard/HazardForm";
+import { AlertTriangle, Clock3, ShieldCheck } from "lucide-react";
 
-import React, { useState } from "react";
-import { AlertTriangle, Send, CheckCircle2 } from "lucide-react";
-
-export default function ReportHazardPage() {
-  const [hazardType, setHazardType] = useState("Flood");
-  const [locationName, setLocationName] = useState("Kelani River Bank, Kolonnawa");
-  const [description, setDescription] = useState("Rapidly rising water entering houses on Main Street.");
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch("/api/hazard-reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hazardType, locationName, description }),
-      });
-      if (res.ok) {
-        setSubmitted(true);
-      }
-    } catch {
-      alert("Submission failed");
-    }
-  };
-
+export default function Page() {
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="pb-4 border-b border-slate-800">
-        <h1 className="text-2xl font-black text-white flex items-center gap-2">
-          <AlertTriangle className="w-6 h-6 text-amber-500" />
-          Report a Local Hazard (Member 2 Stub)
-        </h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Scaffold page for Citizen Hazard Reporting module. Saves report as PENDING_VERIFICATION.
-        </p>
-      </div>
+    <section className="mx-auto w-full max-w-4xl space-y-6">
+      <header className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/70 shadow-2xl shadow-black/20">
+        <div className="h-1 bg-gradient-to-r from-red-600 via-orange-500 to-amber-400" />
 
-      {submitted ? (
-        <div className="p-6 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-center space-y-3">
-          <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
-          <h3 className="text-lg font-bold text-white">Hazard Report Submitted</h3>
-          <p className="text-xs text-slate-300">Your report has been queued for DMC officer verification.</p>
+        <div className="p-6 sm:p-8">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-red-400">
+                <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-red-400">
+                  Citizen safety report
+                </p>
+                <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+                  Report a Hazard
+                </h1>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                  Share accurate details from your location so emergency teams can assess the danger and respond quickly.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 self-start rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              Secure report
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center gap-2 border-t border-slate-800 pt-5 text-xs text-slate-400">
+            <Clock3 className="h-4 w-4 text-amber-400" aria-hidden="true" />
+            Reports are shared with the Disaster Management Center for verification.
+          </div>
         </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Hazard Type</label>
-            <select
-              value={hazardType}
-              onChange={(e) => setHazardType(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm"
-            >
-              <option value="Flood">Flood / Rising Water</option>
-              <option value="Landslide">Landslide / Earth Slip</option>
-              <option value="FallenTree">Fallen Tree / Blocked Road</option>
-              <option value="PowerLine">Damaged Power Lines</option>
-            </select>
-          </div>
+      </header>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Location / Landmark</label>
-            <input
-              type="text"
-              required
-              value={locationName}
-              onChange={(e) => setLocationName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Description</label>
-            <textarea
-              rows={3}
-              required
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm flex items-center justify-center gap-2"
-          >
-            <Send className="w-4 h-4" />
-            <span>Submit Hazard Report</span>
-          </button>
-        </form>
-      )}
-    </div>
+      <HazardForm />
+    </section>
   );
 }
