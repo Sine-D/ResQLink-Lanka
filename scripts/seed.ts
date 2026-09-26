@@ -1,4 +1,4 @@
-import { loadEnvConfig } from "@next/env";
+﻿import { loadEnvConfig } from "@next/env";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import User from "../lib/models/User";
@@ -9,14 +9,12 @@ import RescueTeam from "../lib/models/RescueTeam";
 import Incident from "../lib/models/Incident";
 import { v4 as uuidv4 } from "uuid";
 
-// Load environment variables from .env / .env.local
 loadEnvConfig(process.cwd());
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI || MONGODB_URI.includes("[Enter")) {
   console.error("❌ ERROR: MONGODB_URI environment variable is missing in .env!");
-  console.error("Please add MONGODB_URI=\"your-mongodb-connection-string\" to your .env file.");
   process.exit(1);
 }
 
@@ -52,7 +50,7 @@ async function seed() {
     contactNo: "+94719876543",
   });
 
-  const districtOfficer = await User.create({
+  await User.create({
     name: "Officer Kamal Fernando",
     email: "officer.galle@resqlink.lk",
     passwordHash,
@@ -61,7 +59,7 @@ async function seed() {
     contactNo: "+94785554433",
   });
 
-  const rescueTeamUser = await User.create({
+  await User.create({
     name: "Rescue Lead Wickramasinghe",
     email: "rescue@resqlink.lk",
     passwordHash,
@@ -112,23 +110,33 @@ async function seed() {
 
   console.log("Creating seed relief resources...");
   await ReliefResource.create({
-    resourceId: "RES-FOOD-01",
-    name: "Emergency Dry Rations Pack",
-    category: "FOOD",
+    resourceId: "RES-WATER-01",
+    name: "Water",
+    category: "WATER",
     district: "Colombo",
-    quantity: 500,
-    unit: "Packs",
-    minimumThreshold: 100,
+    quantity: 5000,
+    unit: "units",
+    minimumThreshold: 500,
   });
 
   await ReliefResource.create({
-    resourceId: "RES-WATER-01",
-    name: "Clean Bottled Water (5L)",
-    category: "WATER",
+    resourceId: "RES-FOOD-01",
+    name: "Food",
+    category: "FOOD",
     district: "Colombo",
-    quantity: 1200,
-    unit: "Bottles",
+    quantity: 2000,
+    unit: "units",
     minimumThreshold: 200,
+  });
+
+  await ReliefResource.create({
+    resourceId: "RES-MED-01",
+    name: "Medicine",
+    category: "MEDICAL",
+    district: "Colombo",
+    quantity: 800,
+    unit: "units",
+    minimumThreshold: 100,
   });
 
   console.log("Creating seed rescue team...");
@@ -156,12 +164,6 @@ async function seed() {
   });
 
   console.log("✅ Seeding completed successfully!");
-  console.log("Demo User Accounts:");
-  console.log("  DMC Officer:      dmc@resqlink.lk / password123");
-  console.log("  Citizen:          citizen.colombo@resqlink.lk / password123");
-  console.log("  District Officer: officer.galle@resqlink.lk / password123");
-  console.log("  Rescue Team:      rescue@resqlink.lk / password123");
-
   await mongoose.disconnect();
 }
 
