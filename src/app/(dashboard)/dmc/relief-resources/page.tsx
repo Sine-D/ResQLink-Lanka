@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Droplet, Package, Activity, Boxes, RefreshCw } from "lucide-react";
 
 interface ResourceItem {
@@ -15,108 +16,145 @@ interface ResourceItem {
   icon: "water" | "food" | "medicine";
 }
 
+interface RawResource {
+  _id?: string;
+  resourceId?: string;
+  name: string;
+  district?: string;
+  quantity?: number;
+  unit?: string;
+  minimumThreshold?: number;
+  category?: string;
+}
+
+const DEFAULT_RESOURCES: ResourceItem[] = [
+  {
+    id: "res-1",
+    resourceId: "RES-WATER-01",
+    name: "Water",
+    owner: "Government",
+    quantity: 5000,
+    unit: "units",
+    status: "Available",
+    category: "WATER",
+    icon: "water",
+  },
+  {
+    id: "res-2",
+    resourceId: "RES-FOOD-01",
+    name: "Food",
+    owner: "NGO — Red Cross",
+    quantity: 2000,
+    unit: "units",
+    status: "Available",
+    category: "FOOD",
+    icon: "food",
+  },
+  {
+    id: "res-3",
+    resourceId: "RES-MED-01",
+    name: "Medicine",
+    owner: "Armed Forces",
+    quantity: 800,
+    unit: "units",
+    status: "Low stock",
+    category: "MEDICAL",
+    icon: "medicine",
+  },
+];
+
 export default function ReliefResourcesDashboard() {
-  const [resources, setResources] = useState<ResourceItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const [resources, setResources] = useState<ResourceItem[]>(DEFAULT_RESOURCES);
+  const [loading, setLoading] = useState(false);
   const [totals, setTotals] = useState({
     total: 12450,
     available: 8230,
     distributed: 4220,
   });
 
-  const defaultResources: ResourceItem[] = [
-    {
-      id: "res-1",
-      resourceId: "RES-WATER-01",
-      name: "Water",
-      owner: "Government",
-      quantity: 5000,
-      unit: "units",
-      status: "Available",
-      category: "WATER",
-      icon: "water",
-    },
-    {
-      id: "res-2",
-      resourceId: "RES-FOOD-01",
-      name: "Food",
-      owner: "NGO — Red Cross",
-      quantity: 2000,
-      unit: "units",
-      status: "Available",
-      category: "FOOD",
-      icon: "food",
-    },
-    {
-      id: "res-3",
-      resourceId: "RES-MED-01",
-      name: "Medicine",
-      owner: "Armed Forces",
-      quantity: 800,
-      unit: "units",
-      status: "Low stock",
-      category: "MEDICAL",
-      icon: "medicine",
-    },
-  ];
-
-  const fetchResources = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/relief-resources");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.resources && data.resources.length > 0) {
-          const mapped: ResourceItem[] = data.resources.map((r: any) => {
-            const qty = r.quantity || 0;
-            const isLow = qty <= (r.minimumThreshold || 100);
-            let iconType: "water" | "food" | "medicine" = "food";
-            if (r.category === "WATER" || r.name.toLowerCase().includes("water")) {
-              iconType = "water";
-            } else if (r.category === "MEDICAL" || r.name.toLowerCase().includes("med")) {
-              iconType = "medicine";
-            }
-
-            return {
-              id: r._id || r.resourceId,
-              resourceId: r.resourceId,
-              name: r.name,
-              owner: r.district ? `${r.district} Secretariat` : "Government",
-              quantity: qty,
-              unit: r.unit || "units",
-              status: isLow ? "Low stock" : "Available",
-              category: r.category,
-              icon: iconType,
-            };
-          });
-
-          setResources(mapped.length >= 3 ? mapped : defaultResources);
-
-          const sumAvailable = mapped.reduce(
-            (acc: number, curr: ResourceItem) => acc + curr.quantity,
-            0
-          );
-          setTotals({
-            total: sumAvailable > 0 ? sumAvailable + 4220 : 12450,
-            available: sumAvailable > 0 ? sumAvailable : 8230,
-            distributed: 4220,
-          });
-        } else {
-          setResources(defaultResources);
-        }
-      } else {
-        setResources(defaultResources);
-      }
-    } catch {
-      setResources(defaultResources);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchResources();
+    let isMounted = true;
+    fetch("/api/relief-resources")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!isMounted || !data || !data.resources || data.resources.length === 0) return;
+        const mapped: ResourceItem[] = data.resources.map((r: RawResource) => {
+          const qty = r.quantity || 0;
+          const isLow = qty <= (r.minimumThreshold || 100);
+          let iconType: "water" | "food" | "medicine" = "food";
+          if (r.category === "WATER" || r.name.toLowerCase().includes("water")) {
+            iconType = "water";
+          } else if (r.category === "MEDICAL" || r.name.toLowerCase().includes("med")) {
+            iconType = "medicine";
+          }
+
+          return {
+            id: r._id || r.resourceId || `res-${Math.random()}`,
+            resourceId: r.resourceId,
+            name: r.name,
+            owner: r.district ? `${r.district} Secretariat` : "Government",
+            quantity: qty,
+            unit: r.unit || "units",
+            status: isLow ? "Low stock" : "Available",
+            category: r.category,
+            icon: iconType,
+          };
+        });
+
+        setResources(mapped.length >= 3 ? mapped : DEFAULT_RESOURCES);
+        const sumAvailable = mapped.reduce(
+          (acc: number, curr: ResourceItem) => acc + curr.quantity,
+          0
+        );
+        setTotals({
+          total: sumAvailable > 0 ? sumAvailable + 4220 : 12450,
+          available: sumAvailable > 0 ? sumAvailable : 8230,
+          distributed: 4220,
+        });
+      })
+      .catch(() => {
+        // Keep initial state on error
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    fetch("/api/relief-resources")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || !data.resources || data.resources.length === 0) return;
+        const mapped: ResourceItem[] = data.resources.map((r: RawResource) => {
+          const qty = r.quantity || 0;
+          const isLow = qty <= (r.minimumThreshold || 100);
+          let iconType: "water" | "food" | "medicine" = "food";
+          if (r.category === "WATER" || r.name.toLowerCase().includes("water")) {
+            iconType = "water";
+          } else if (r.category === "MEDICAL" || r.name.toLowerCase().includes("med")) {
+            iconType = "medicine";
+          }
+
+          return {
+            id: r._id || r.resourceId || `res-${Math.random()}`,
+            resourceId: r.resourceId,
+            name: r.name,
+            owner: r.district ? `${r.district} Secretariat` : "Government",
+            quantity: qty,
+            unit: r.unit || "units",
+            status: isLow ? "Low stock" : "Available",
+            category: r.category,
+            icon: iconType,
+          };
+        });
+
+        setResources(mapped.length >= 3 ? mapped : DEFAULT_RESOURCES);
+      })
+      .finally(() => setLoading(false));
+  };
 
   const renderIcon = (iconType: "water" | "food" | "medicine") => {
     switch (iconType) {
@@ -129,6 +167,12 @@ export default function ReliefResourcesDashboard() {
       default:
         return <Boxes className="w-4 h-4 text-slate-400" />;
     }
+  };
+
+  const handleDistributeClick = (item: ResourceItem) => {
+    router.push(
+      `/dmc/relief-resources/create?name=${encodeURIComponent(item.name)}&stock=${item.quantity}&owner=${encodeURIComponent(item.owner)}`
+    );
   };
 
   return (
@@ -197,7 +241,7 @@ export default function ReliefResourcesDashboard() {
             </p>
           </div>
           <button
-            onClick={fetchResources}
+            onClick={handleRefresh}
             className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors"
             title="Refresh Inventory"
           >
@@ -263,9 +307,7 @@ export default function ReliefResourcesDashboard() {
                     {/* Action Button */}
                     <td className="py-4 px-6 text-right">
                       <button
-                        onClick={() => {
-                          alert(`Initiating distribution for ${item.name}`);
-                        }}
+                        onClick={() => handleDistributeClick(item)}
                         className="inline-flex items-center justify-center px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all active:scale-95"
                       >
                         Distribute
