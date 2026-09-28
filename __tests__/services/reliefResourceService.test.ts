@@ -1,5 +1,6 @@
-﻿import ReliefResource from "../../lib/models/ReliefResource";
+import ReliefResource from "../../lib/models/ReliefResource";
 import Distribution from "../../lib/models/Distribution";
+import DispatchOrder from "../../lib/models/DispatchOrder";
 import User from "../../lib/models/User";
 import {
   listAvailableResources,
@@ -12,11 +13,13 @@ import {
 
 jest.mock("../../lib/models/ReliefResource");
 jest.mock("../../lib/models/Distribution");
+jest.mock("../../lib/models/DispatchOrder");
 jest.mock("../../lib/models/User");
 
 describe("Backend Resource Management Service Tests", () => {
   let mockResourcesStore: any[] = [];
   let mockDistributionsStore: any[] = [];
+  let mockDispatchOrdersStore: any[] = [];
   const dummyOfficerId = "507f1f77bcf86cd799439011";
 
   beforeEach(() => {
@@ -69,6 +72,7 @@ describe("Backend Resource Management Service Tests", () => {
       },
     ];
     mockDistributionsStore = [];
+    mockDispatchOrdersStore = [];
 
     (ReliefResource.find as jest.Mock).mockImplementation((query: any = {}) => {
       let result = [...mockResourcesStore];
@@ -91,6 +95,12 @@ describe("Backend Resource Management Service Tests", () => {
     (Distribution.create as jest.Mock).mockImplementation((data: any) => {
       const doc = { ...data, _id: `dist_${Math.random()}` };
       mockDistributionsStore.push(doc);
+      return Promise.resolve(doc);
+    });
+
+    (DispatchOrder.create as jest.Mock).mockImplementation((data: any) => {
+      const doc = { ...data, _id: `dispatch_${Math.random()}` };
+      mockDispatchOrdersStore.push(doc);
       return Promise.resolve(doc);
     });
 
@@ -130,30 +140,31 @@ describe("Backend Resource Management Service Tests", () => {
     );
   });
 
-  test("6. Allocate multi-agency resources from multiple agencies for one requirement", async () => {
+  test("6. Allocate multi-agency resources from multiple agencies for one requirement (e.g. 700 Water = 400 Agency A + 300 Agency B)", async () => {
     const payload = {
       items: [
-        { resourceId: "RES-WATER-01", quantity: 1500, agency: "Government" },
-        { resourceId: "RES-FOOD-01", quantity: 500, agency: "NGO — Red Cross" },
+        { resourceId: "RES-WATER-01", quantity: 400, agency: "Government — DMC Main Warehouse" },
+        { resourceId: "RES-FOOD-01", quantity: 300, agency: "NGO — Red Cross Relief Fleet" },
       ],
       district: "Colombo",
-      requirementNotes: "Multi-agency disaster response allocation",
+      requirementNotes: "Multi-agency disaster response allocation for 700 Water requirement",
     };
 
     const result = await allocateMultiAgencyResources(payload, dummyOfficerId);
     expect(result.updatedResources.length).toBe(2);
     expect(result.distributions.length).toBe(2);
+    expect(result.dispatchOrder).toBeDefined();
 
-    // Verify stock deductions
-    expect(mockResourcesStore[0].quantity).toBe(3500); // 5000 - 1500
-    expect(mockResourcesStore[1].quantity).toBe(1500); // 2000 - 500
+    // Verify stock deductions (400 + 300 = 700 total)
+    expect(mockResourcesStore[0].quantity).toBe(4600); // 5000 - 400
+    expect(mockResourcesStore[1].quantity).toBe(1700); // 2000 - 300
   });
 
   test("7. Server-side pre-validation prevents partial allocation if any resource has insufficient stock", async () => {
     const payload = {
       items: [
         { resourceId: "RES-WATER-01", quantity: 100, agency: "Government" },
-        { resourceId: "RES-FOOD-01", quantity: 99999, agency: "NGO — Red Cross" }, // Excessive
+        { resourceId: "RES-FOOD-01", quantity: 99999, agency: "NGO — Red Cross" },
       ],
       district: "Colombo",
     };
