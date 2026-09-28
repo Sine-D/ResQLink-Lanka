@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 
 export const resourceCategoryEnum = z.enum(["FOOD", "WATER", "MEDICAL", "SHELTER", "CLOTHING"]);
 export const availabilityStatusEnum = z.enum(["AVAILABLE", "LOW_STOCK", "DEPLETED", "UNAVAILABLE"]);
