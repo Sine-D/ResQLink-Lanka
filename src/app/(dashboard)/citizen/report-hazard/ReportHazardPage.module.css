@@ -1,0 +1,78 @@
+.screen {
+  min-height: 100dvh;
+  background: #ffffff;
+  color: #14213d;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  min-height: 64px;
+  padding: 0 20px;
+  border-bottom: 1px solid #e7edf5;
+  background: #ffffff;
+}
+
+.header h1 {
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  text-align: center;
+  color: #172033;
+}
+
+.backButton {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f3f7fb;
+  color: #1f2b40;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.backButton:hover {
+  background: #e8f0f8;
+  color: #066cf1;
+}
+
+.backButton:focus-visible {
+  outline: 3px solid rgb(7 111 244 / 24%);
+  outline-offset: 2px;
+}
+
+.backButton svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.4;
+}
+
+.headerSpacer {
+  width: 32px;
+}
+
+.content {
+  padding: 22px 20px 36px;
+}
+
+.introduction {
+  margin-bottom: 22px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.48;
+}
+
+@media (min-width: 640px) {
+  .screen {
+    width: min(100%, 430px);
+    min-height: calc(100dvh - 48px);
+    margin: 24px auto;
+    overflow: hidden;
+    border: 1px solid #e4eaf2;
+    border-radius: 22px;
+    box-shadow: 0 20px 60px rgb(15 31 56 / 12%);
+  }
+}
