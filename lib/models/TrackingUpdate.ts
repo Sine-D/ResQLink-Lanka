@@ -1,4 +1,4 @@
-﻿import mongoose, { Schema, Document, Model } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 import { DispatchStatus, ILocationCoordinates } from "./DispatchOrder";
 
 export interface ITrackingUpdate extends Document {
