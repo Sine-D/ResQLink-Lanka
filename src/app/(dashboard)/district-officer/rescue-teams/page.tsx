@@ -89,7 +89,22 @@ export default function RescueTeamsPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: name === "memberCount" ? parseInt(value) || 0 : value });
+    
+    if (name === "memberCount") {
+      const newCount = parseInt(value) || 0;
+      setFormData({ ...formData, memberCount: newCount });
+      
+      // Auto-adjust members array to match the new count
+      if (newCount > members.length) {
+        const diff = newCount - members.length;
+        const newRows = Array.from({ length: diff }, () => ({ name: "", contactNo: "" }));
+        setMembers([...members, ...newRows]);
+      } else if (newCount < members.length) {
+        setMembers(members.slice(0, newCount));
+      }
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleContactChange = (index: number, value: string) => {
@@ -111,15 +126,15 @@ export default function RescueTeamsPage() {
   };
 
   const addMemberRow = () => {
-    if (members.length < formData.memberCount) {
-      setMembers([...members, { name: "", contactNo: "" }]);
-    }
+    setMembers([...members, { name: "", contactNo: "" }]);
+    setFormData(prev => ({ ...prev, memberCount: prev.memberCount + 1 }));
   };
 
   const removeMemberRow = (index: number) => {
     const newMembers = [...members];
     newMembers.splice(index, 1);
     setMembers(newMembers);
+    setFormData(prev => ({ ...prev, memberCount: Math.max(0, prev.memberCount - 1) }));
   };
 
   const handleMemberChange = (index: number, field: keyof TeamMember, value: string) => {
@@ -369,12 +384,11 @@ export default function RescueTeamsPage() {
           {/* Add Members Section */}
           <div className="col-span-full border-t border-slate-800 pt-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">Team Members ({members.length}/{formData.memberCount})</h3>
+              <h3 className="text-sm font-semibold text-white">Team Members ({members.length})</h3>
               <button
                 type="button"
                 onClick={addMemberRow}
-                disabled={members.length >= formData.memberCount}
-                className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               >
                 <Plus className="w-4 h-4" /> Add Member
               </button>
