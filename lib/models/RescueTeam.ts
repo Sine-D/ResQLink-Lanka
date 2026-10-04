@@ -10,6 +10,7 @@ export interface IRescueTeam extends Document {
   memberCount: number;
   members?: { name: string; contactNo: string }[];
   isAvailable: boolean;
+  status: string;
   contactNo?: string;
   contactNumbers: string[];
   expertise?: string;
@@ -31,6 +32,7 @@ const RescueTeamSchema = new Schema<IRescueTeam>(
       contactNo: { type: String }
     }],
     isAvailable: { type: Boolean, default: true },
+    status: { type: String, enum: ['Active', 'Inactive', 'Standby'], default: 'Active' },
     contactNo: { type: String }, // Primary contact for legacy code
     contactNumbers: [{ type: String, required: true }],
     expertise: { type: String },

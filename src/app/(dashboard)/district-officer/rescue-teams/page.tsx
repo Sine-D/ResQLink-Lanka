@@ -12,6 +12,10 @@ interface RescueTeam {
   location: string;
   expertise: string;
   isAvailable: boolean;
+  status?: string;
+  contactNumbers?: string[];
+  equipmentList?: string;
+  members?: TeamMember[];
 }
 
 interface TeamMember {
@@ -23,6 +27,11 @@ export default function RescueTeamsPage() {
   const [teams, setTeams] = useState<RescueTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  
+  const [selectedTeam, setSelectedTeam] = useState<RescueTeam | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     leadOfficer: "",
@@ -130,8 +139,50 @@ export default function RescueTeamsPage() {
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    if (!selectedTeam) return;
+    setUpdatingStatus(true);
+    
+    try {
+      const res = await fetch(`/api/rescue-teams/${selectedTeam._id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        const updatedTeam = await res.json();
+        setTeams(teams.map(t => t._id === updatedTeam._id ? updatedTeam : t));
+        setSelectedTeam(updatedTeam);
+      }
+    } catch (error) {
+      console.error("Failed to update status:", error);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const openModal = (team: RescueTeam) => {
+    setSelectedTeam(team);
+    setIsModalOpen(true);
+  };
+
+  const getStatusBadge = (team: RescueTeam) => {
+    const status = team.status || (team.isAvailable ? 'Active' : 'Inactive');
+    
+    if (status === 'Active') {
+      return <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/10 text-green-400">Active</span>;
+    }
+    if (status === 'Standby') {
+      return <span className="px-2 py-1 rounded text-xs font-medium bg-amber-500/10 text-amber-400">Standby</span>;
+    }
+    return <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/10 text-red-400">Inactive</span>;
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <h1 className="text-2xl font-black text-white mb-2">Rescue Teams</h1>
 
       {/* Registration Form */}
@@ -375,12 +426,13 @@ export default function RescueTeamsPage() {
                     <td className="px-4 py-4">{team.location || team.district}</td>
                     <td className="px-4 py-4">{team.expertise || "-"}</td>
                     <td className="px-4 py-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${team.isAvailable ? 'bg-green-500/10 text-green-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                        {team.isAvailable ? 'Active' : 'On Standby'}
-                      </span>
+                      {getStatusBadge(team)}
                     </td>
                     <td className="px-4 py-4 text-center">
-                      <button className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors">
+                      <button 
+                        onClick={() => openModal(team)}
+                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                      >
                         View
                       </button>
                     </td>
@@ -391,6 +443,107 @@ export default function RescueTeamsPage() {
           </table>
         </div>
       </div>
+
+      {/* Team Details Modal */}
+      {isModalOpen && selectedTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-800 p-6 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-white">Team Details</h2>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-400 font-medium">Team Name</p>
+                  <p className="text-sm text-white font-medium">{selectedTeam.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 font-medium">Location</p>
+                  <p className="text-sm text-white font-medium">{selectedTeam.location || selectedTeam.district}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 font-medium">Team Leader</p>
+                  <p className="text-sm text-white font-medium">{selectedTeam.leadOfficer}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 font-medium">Expertise</p>
+                  <p className="text-sm text-white font-medium">{selectedTeam.expertise || "Unknown"}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400 font-medium mb-2">Team Contact Numbers</p>
+                {selectedTeam.contactNumbers && selectedTeam.contactNumbers.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTeam.contactNumbers.map((no, idx) => (
+                      <span key={idx} className="px-2 py-1 bg-slate-800 text-slate-300 rounded text-xs border border-slate-700">{no}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">No contact numbers available.</p>
+                )}
+              </div>
+
+              {selectedTeam.equipmentList && (
+                <div>
+                  <p className="text-xs text-slate-400 font-medium mb-1">Equipment List</p>
+                  <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{selectedTeam.equipmentList}</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedTeam.members && selectedTeam.members.length > 0 && (
+                <div>
+                  <p className="text-xs text-slate-400 font-medium mb-2">Team Members ({selectedTeam.members.length})</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedTeam.members.map((member, idx) => (
+                      <div key={idx} className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex justify-between items-center">
+                        <span className="text-sm text-white">{member.name}</span>
+                        <span className="text-xs text-slate-400">{member.contactNo}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t border-slate-800 pt-6">
+                <p className="text-sm text-white font-semibold mb-3">Change Team Status</p>
+                <div className="flex flex-wrap gap-3">
+                  <button 
+                    onClick={() => handleStatusChange('Active')}
+                    disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Active'}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Set Active
+                  </button>
+                  <button 
+                    onClick={() => handleStatusChange('Standby')}
+                    disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Standby'}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Set Standby
+                  </button>
+                  <button 
+                    onClick={() => handleStatusChange('Inactive')}
+                    disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Inactive'}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Set Inactive
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
