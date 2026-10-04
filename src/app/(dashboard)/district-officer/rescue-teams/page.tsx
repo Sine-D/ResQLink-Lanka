@@ -48,6 +48,9 @@ export default function RescueTeamsPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [locationFilter, setLocationFilter] = useState("All");
 
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editedTeam, setEditedTeam] = useState<RescueTeam | null>(null);
+
   const fetchTeams = async () => {
     try {
       const res = await fetch("/api/rescue-teams");
@@ -186,8 +189,44 @@ export default function RescueTeamsPage() {
     }
   };
 
+  const handleSaveDetails = async () => {
+    if (!editedTeam) return;
+    setUpdatingStatus(true);
+    
+    try {
+      const res = await fetch(`/api/rescue-teams/${editedTeam._id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: editedTeam.name,
+          leadOfficer: editedTeam.leadOfficer,
+          location: editedTeam.location,
+          expertise: editedTeam.expertise,
+          equipmentList: editedTeam.equipmentList,
+          contactNumbers: editedTeam.contactNumbers?.filter(c => c.trim() !== "") || [],
+          members: editedTeam.members?.filter(m => m.name.trim() !== "") || []
+        }),
+      });
+
+      if (res.ok) {
+        const updatedTeam = await res.json();
+        setTeams(teams.map(t => t._id === updatedTeam._id ? updatedTeam : t));
+        setSelectedTeam(updatedTeam);
+        setIsEditingDetails(false);
+      }
+    } catch (error) {
+      console.error("Failed to update team details:", error);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const openModal = (team: RescueTeam) => {
     setSelectedTeam(team);
+    setEditedTeam(JSON.parse(JSON.stringify(team))); // deep copy
+    setIsEditingDetails(false);
     setIsModalOpen(true);
   };
 
@@ -487,101 +526,275 @@ export default function RescueTeamsPage() {
       </div>
 
       {/* Team Details Modal */}
-      {isModalOpen && selectedTeam && (
+      {isModalOpen && selectedTeam && editedTeam && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-slate-900 border-b border-slate-800 p-6 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-white">Team Details</h2>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-800 p-6 flex justify-between items-center z-10">
+              <h2 className="text-xl font-bold text-white">
+                {isEditingDetails ? "Edit Team Details" : "Team Details"}
+              </h2>
+              <div className="flex gap-2">
+                {!isEditingDetails ? (
+                  <button 
+                    onClick={() => setIsEditingDetails(true)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setEditedTeam(JSON.parse(JSON.stringify(selectedTeam)));
+                        setIsEditingDetails(false);
+                      }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={handleSaveDetails}
+                      disabled={updatingStatus}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {updatingStatus ? "Saving..." : "Save"}
+                    </button>
+                  </>
+                )}
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors ml-2"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
             
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Team Name</p>
-                  <p className="text-sm text-white font-medium">{selectedTeam.name}</p>
+                  <p className="text-xs text-slate-400 font-medium mb-1">Team Name</p>
+                  {isEditingDetails ? (
+                    <input 
+                      type="text"
+                      value={editedTeam.name}
+                      onChange={(e) => setEditedTeam({...editedTeam, name: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                    />
+                  ) : (
+                    <p className="text-sm text-white font-medium">{selectedTeam.name}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Location</p>
-                  <p className="text-sm text-white font-medium">{selectedTeam.location || selectedTeam.district}</p>
+                  <p className="text-xs text-slate-400 font-medium mb-1">Location</p>
+                  {isEditingDetails ? (
+                    <input 
+                      type="text"
+                      value={editedTeam.location || editedTeam.district}
+                      onChange={(e) => setEditedTeam({...editedTeam, location: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                    />
+                  ) : (
+                    <p className="text-sm text-white font-medium">{selectedTeam.location || selectedTeam.district}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Team Leader</p>
-                  <p className="text-sm text-white font-medium">{selectedTeam.leadOfficer}</p>
+                  <p className="text-xs text-slate-400 font-medium mb-1">Team Leader</p>
+                  {isEditingDetails ? (
+                    <input 
+                      type="text"
+                      value={editedTeam.leadOfficer}
+                      onChange={(e) => setEditedTeam({...editedTeam, leadOfficer: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                    />
+                  ) : (
+                    <p className="text-sm text-white font-medium">{selectedTeam.leadOfficer}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Expertise</p>
-                  <p className="text-sm text-white font-medium">{selectedTeam.expertise || "Unknown"}</p>
+                  <p className="text-xs text-slate-400 font-medium mb-1">Expertise</p>
+                  {isEditingDetails ? (
+                    <select
+                      value={editedTeam.expertise || "Fire"}
+                      onChange={(e) => setEditedTeam({...editedTeam, expertise: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="Fire">Fire</option>
+                      <option value="Flood">Flood</option>
+                      <option value="Landslide">Landslide</option>
+                      <option value="Medical">Medical</option>
+                    </select>
+                  ) : (
+                    <p className="text-sm text-white font-medium">{selectedTeam.expertise || "Unknown"}</p>
+                  )}
                 </div>
               </div>
 
               <div>
-                <p className="text-xs text-slate-400 font-medium mb-2">Team Contact Numbers</p>
-                {selectedTeam.contactNumbers && selectedTeam.contactNumbers.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedTeam.contactNumbers.map((no, idx) => (
-                      <span key={idx} className="px-2 py-1 bg-slate-800 text-slate-300 rounded text-xs border border-slate-700">{no}</span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500">No contact numbers available.</p>
-                )}
-              </div>
-
-              {selectedTeam.equipmentList && (
-                <div>
-                  <p className="text-xs text-slate-400 font-medium mb-1">Equipment List</p>
-                  <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{selectedTeam.equipmentList}</p>
-                  </div>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-xs text-slate-400 font-medium">Team Contact Numbers</p>
+                  {isEditingDetails && (editedTeam.contactNumbers?.length || 0) < 5 && (
+                    <button 
+                      onClick={() => setEditedTeam({...editedTeam, contactNumbers: [...(editedTeam.contactNumbers || []), ""]})}
+                      className="text-xs text-blue-400 flex items-center"
+                    >
+                      <Plus className="w-3 h-3 mr-0.5" /> Add
+                    </button>
+                  )}
                 </div>
-              )}
-
-              {selectedTeam.members && selectedTeam.members.length > 0 && (
-                <div>
-                  <p className="text-xs text-slate-400 font-medium mb-2">Team Members ({selectedTeam.members.length})</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {selectedTeam.members.map((member, idx) => (
-                      <div key={idx} className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex justify-between items-center">
-                        <span className="text-sm text-white">{member.name}</span>
-                        <span className="text-xs text-slate-400">{member.contactNo}</span>
+                
+                {isEditingDetails ? (
+                  <div className="space-y-2">
+                    {editedTeam.contactNumbers?.map((no, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <input 
+                          type="text"
+                          value={no}
+                          onChange={(e) => {
+                            const newContacts = [...(editedTeam.contactNumbers || [])];
+                            newContacts[idx] = e.target.value;
+                            setEditedTeam({...editedTeam, contactNumbers: newContacts});
+                          }}
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                        />
+                        <button 
+                          onClick={() => {
+                            const newContacts = [...(editedTeam.contactNumbers || [])];
+                            newContacts.splice(idx, 1);
+                            setEditedTeam({...editedTeam, contactNumbers: newContacts});
+                          }}
+                          className="p-1.5 bg-slate-950 border border-slate-800 text-slate-500 hover:text-red-400 rounded-lg"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     ))}
                   </div>
+                ) : (
+                  selectedTeam.contactNumbers && selectedTeam.contactNumbers.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTeam.contactNumbers.map((no, idx) => (
+                        <span key={idx} className="px-2 py-1 bg-slate-800 text-slate-300 rounded text-xs border border-slate-700">{no}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">No contact numbers available.</p>
+                  )
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400 font-medium mb-1">Equipment List</p>
+                {isEditingDetails ? (
+                  <textarea
+                    rows={3}
+                    value={editedTeam.equipmentList || ""}
+                    onChange={(e) => setEditedTeam({...editedTeam, equipmentList: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
+                  ></textarea>
+                ) : (
+                  selectedTeam.equipmentList && (
+                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <p className="text-sm text-slate-300 whitespace-pre-wrap">{selectedTeam.equipmentList}</p>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-xs text-slate-400 font-medium">Team Members ({(editedTeam.members || []).length})</p>
+                  {isEditingDetails && (
+                    <button 
+                      onClick={() => setEditedTeam({...editedTeam, members: [...(editedTeam.members || []), { name: "", contactNo: "" }]})}
+                      className="text-xs text-blue-400 flex items-center"
+                    >
+                      <Plus className="w-3 h-3 mr-0.5" /> Add Member
+                    </button>
+                  )}
+                </div>
+                
+                {isEditingDetails ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                    {editedTeam.members?.map((member, idx) => (
+                      <div key={idx} className="flex gap-2 items-center bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <input 
+                          type="text"
+                          placeholder="Name"
+                          value={member.name}
+                          onChange={(e) => {
+                            const newMembers = [...(editedTeam.members || [])];
+                            newMembers[idx].name = e.target.value;
+                            setEditedTeam({...editedTeam, members: newMembers});
+                          }}
+                          className="flex-1 bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                        />
+                        <input 
+                          type="text"
+                          placeholder="Contact"
+                          value={member.contactNo}
+                          onChange={(e) => {
+                            const newMembers = [...(editedTeam.members || [])];
+                            newMembers[idx].contactNo = e.target.value;
+                            setEditedTeam({...editedTeam, members: newMembers});
+                          }}
+                          className="flex-1 bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                        />
+                        <button 
+                          onClick={() => {
+                            const newMembers = [...(editedTeam.members || [])];
+                            newMembers.splice(idx, 1);
+                            setEditedTeam({...editedTeam, members: newMembers});
+                          }}
+                          className="p-1 text-slate-500 hover:text-red-400"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  selectedTeam.members && selectedTeam.members.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-2">
+                      {selectedTeam.members.map((member, idx) => (
+                        <div key={idx} className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex justify-between items-center">
+                          <span className="text-sm text-white">{member.name}</span>
+                          <span className="text-xs text-slate-400">{member.contactNo}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null
+                )}
+              </div>
+
+              {!isEditingDetails && (
+                <div className="border-t border-slate-800 pt-6">
+                  <p className="text-sm text-white font-semibold mb-3">Change Team Status</p>
+                  <div className="flex flex-wrap gap-3">
+                    <button 
+                      onClick={() => handleStatusChange('Active')}
+                      disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Active'}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Set Active
+                    </button>
+                    <button 
+                      onClick={() => handleStatusChange('Standby')}
+                      disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Standby'}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Set Standby
+                    </button>
+                    <button 
+                      onClick={() => handleStatusChange('Inactive')}
+                      disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Inactive'}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Set Inactive
+                    </button>
+                  </div>
                 </div>
               )}
-
-              <div className="border-t border-slate-800 pt-6">
-                <p className="text-sm text-white font-semibold mb-3">Change Team Status</p>
-                <div className="flex flex-wrap gap-3">
-                  <button 
-                    onClick={() => handleStatusChange('Active')}
-                    disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Active'}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Set Active
-                  </button>
-                  <button 
-                    onClick={() => handleStatusChange('Standby')}
-                    disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Standby'}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Set Standby
-                  </button>
-                  <button 
-                    onClick={() => handleStatusChange('Inactive')}
-                    disabled={updatingStatus || (selectedTeam.status || (selectedTeam.isAvailable ? 'Active' : 'Inactive')) === 'Inactive'}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Set Inactive
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>

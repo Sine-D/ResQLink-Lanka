@@ -22,8 +22,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (body.status) {
       team.status = body.status;
-      // Also update isAvailable for legacy compatibility
       team.isAvailable = body.status === 'Active';
+    }
+    
+    // Update other fields if provided
+    if (body.name !== undefined) team.name = body.name;
+    if (body.leadOfficer !== undefined) team.leadOfficer = body.leadOfficer;
+    if (body.location !== undefined) team.location = body.location;
+    if (body.expertise !== undefined) team.expertise = body.expertise;
+    if (body.equipmentList !== undefined) team.equipmentList = body.equipmentList;
+    if (body.contactNumbers !== undefined) team.contactNumbers = body.contactNumbers;
+    if (body.members !== undefined) team.members = body.members;
+    
+    // For legacy support
+    if (team.contactNumbers && team.contactNumbers.length > 0) {
+      team.contactNo = team.contactNumbers[0];
     }
 
     const updatedTeam = await team.save();
