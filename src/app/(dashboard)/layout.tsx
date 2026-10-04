@@ -33,11 +33,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isDmc = userRole === "DMC_OFFICER";
   const isDistrictOfficer = userRole === "DISTRICT_OFFICER";
+  const isHazardReport = pathname === "/citizen/report-hazard";
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100">
+    <div
+      className={
+        isHazardReport
+          ? "min-h-screen bg-slate-100"
+          : "min-h-screen flex bg-slate-950 text-slate-100"
+      }
+    >
       {/* Sidebar Nav */}
-      <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4 shrink-0">
+      <aside
+        className={`${isHazardReport ? "hidden" : "flex"} w-64 bg-slate-900 border-r border-slate-800 flex-col justify-between p-4 shrink-0`}
+      >
         <div className="space-y-6">
           <Link href="/" className="flex items-center gap-2.5 px-2">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center text-white shadow-md shadow-red-600/30">
@@ -286,7 +295,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content Viewport */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl">{children}</main>
+      <main
+        className={
+          isHazardReport
+            ? "min-h-screen w-full overflow-y-auto"
+            : "flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl"
+        }
+      >
+        {children}
+      </main>
       {!isDmc && !isDistrictOfficer && <HazardSyncManager />}
     </div>
   );

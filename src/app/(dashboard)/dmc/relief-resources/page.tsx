@@ -1,8 +1,18 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Droplet, Package, Activity, Boxes, RefreshCw } from "lucide-react";
+import {
+  Droplet,
+  Package,
+  Activity,
+  Boxes,
+  RefreshCw,
+  Truck,
+  MapPin,
+  Clock,
+  Eye,
+} from "lucide-react";
 
 interface ResourceItem {
   id: string;
@@ -25,6 +35,16 @@ interface RawResource {
   unit?: string;
   minimumThreshold?: number;
   category?: string;
+}
+
+export interface DispatchedOrder {
+  id: string;
+  destination: string;
+  resources: string;
+  agencyTeam: string;
+  eta: string;
+  status: "IN_TRANSIT" | "DISPATCHED" | "DELIVERED";
+  lastLocation: string;
 }
 
 const DEFAULT_RESOURCES: ResourceItem[] = [
@@ -63,9 +83,40 @@ const DEFAULT_RESOURCES: ResourceItem[] = [
   },
 ];
 
+const DEFAULT_DISPATCHES: DispatchedOrder[] = [
+  {
+    id: "DISP-2026-0042",
+    destination: "Colombo (Kolonnawa Relief Hub)",
+    resources: "Clean Bottled Water (3,000 units), Rations (1,500 packs)",
+    agencyTeam: "Sri Lanka Navy & Red Cross Joint Taskforce",
+    eta: "~35 mins remaining",
+    status: "IN_TRANSIT",
+    lastLocation: "Peliyagoda Bridge Intersection",
+  },
+  {
+    id: "DISP-2026-0039",
+    destination: "Kalutara (Millaniya District Center)",
+    resources: "Clean Bottled Water (2,000 units), Meal Packs (1,000 packs)",
+    agencyTeam: "Armed Forces Logistic Wing",
+    eta: "~1 hr 20 mins",
+    status: "DISPATCHED",
+    lastLocation: "Panadura Logistic Hub Checkpoint",
+  },
+  {
+    id: "DISP-2026-0031",
+    destination: "Gampaha (Kelaniya Community Shelter)",
+    resources: "Emergency Dry Rations (2,500 packs), Hygiene Kits (600)",
+    agencyTeam: "Civil Defence Force & Response Squad",
+    eta: "Delivered",
+    status: "DELIVERED",
+    lastLocation: "Kelaniya Community Shelter Gate #1",
+  },
+];
+
 export default function ReliefResourcesDashboard() {
   const router = useRouter();
   const [resources, setResources] = useState<ResourceItem[]>(DEFAULT_RESOURCES);
+  const [dispatches] = useState<DispatchedOrder[]>(DEFAULT_DISPATCHES);
   const [loading, setLoading] = useState(false);
   const [totals, setTotals] = useState({
     total: 12450,
@@ -90,10 +141,10 @@ export default function ReliefResourcesDashboard() {
           }
 
           return {
-            id: r._id || r.resourceId || `res-${Math.random()}`,
+            id: r._id || r.resourceId || ("res-" + Math.random()),
             resourceId: r.resourceId,
             name: r.name,
-            owner: r.district ? `${r.district} Secretariat` : "Government",
+            owner: r.district ? (r.district + " Secretariat") : "Government",
             quantity: qty,
             unit: r.unit || "units",
             status: isLow ? "Low stock" : "Available",
@@ -139,10 +190,10 @@ export default function ReliefResourcesDashboard() {
           }
 
           return {
-            id: r._id || r.resourceId || `res-${Math.random()}`,
+            id: r._id || r.resourceId || ("res-" + Math.random()),
             resourceId: r.resourceId,
             name: r.name,
-            owner: r.district ? `${r.district} Secretariat` : "Government",
+            owner: r.district ? (r.district + " Secretariat") : "Government",
             quantity: qty,
             unit: r.unit || "units",
             status: isLow ? "Low stock" : "Available",
@@ -171,7 +222,7 @@ export default function ReliefResourcesDashboard() {
 
   const handleDistributeClick = (item: ResourceItem) => {
     router.push(
-      `/dmc/relief-resources/create?name=${encodeURIComponent(item.name)}&stock=${item.quantity}&owner=${encodeURIComponent(item.owner)}`
+      "/dmc/relief-resources/create?name=" + encodeURIComponent(item.name) + "&stock=" + item.quantity + "&owner=" + encodeURIComponent(item.owner)
     );
   };
 
@@ -183,7 +234,7 @@ export default function ReliefResourcesDashboard() {
           Relief Resource Dashboard
         </h1>
         <p className="text-xs text-slate-400 mt-1">
-          Monitor stock levels and initiate distributions to affected districts.
+          Monitor stock levels, initiate distributions, and track dispatched relief convoys in real time.
         </p>
       </div>
 
@@ -245,7 +296,7 @@ export default function ReliefResourcesDashboard() {
             className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors"
             title="Refresh Inventory"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={"w-4 h-4 " + (loading ? "animate-spin" : "")} />
           </button>
         </div>
 
@@ -319,6 +370,121 @@ export default function ReliefResourcesDashboard() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Dispatched Relief Orders & Live Tracking Section */}
+      <div id="dispatches" className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-6 border-b border-slate-800 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <Truck className="w-4 h-4" />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                Dispatched Relief Orders & Live Tracking
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Active relief convoys and field distribution operations currently en route to affected areas.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            {dispatches.length} Dispatched Order(s)
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+              <tr>
+                <th className="py-4 px-6">DISPATCH ID</th>
+                <th className="py-4 px-6">DESTINATION</th>
+                <th className="py-4 px-6">RESOURCES</th>
+                <th className="py-4 px-6">AGENCY / TEAM</th>
+                <th className="py-4 px-6">ETA</th>
+                <th className="py-4 px-6">STATUS</th>
+                <th className="py-4 px-6 text-right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-200">
+              {dispatches.map((dispatch) => (
+                <tr
+                  key={dispatch.id}
+                  className="hover:bg-slate-800/40 transition-colors"
+                >
+                  {/* Dispatch ID */}
+                  <td className="py-4 px-6 font-mono font-bold text-white">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-3.5 h-3.5 text-blue-400" />
+                      <span>{dispatch.id}</span>
+                    </div>
+                  </td>
+
+                  {/* Destination */}
+                  <td className="py-4 px-6">
+                    <div className="font-semibold text-white flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      <span>{dispatch.destination}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 pl-4">
+                      Last: {dispatch.lastLocation}
+                    </div>
+                  </td>
+
+                  {/* Resources */}
+                  <td className="py-4 px-6 text-slate-300 font-medium max-w-xs">
+                    {dispatch.resources}
+                  </td>
+
+                  {/* Responsible Agency / Team */}
+                  <td className="py-4 px-6 text-slate-300">
+                    {dispatch.agencyTeam}
+                  </td>
+
+                  {/* ETA */}
+                  <td className="py-4 px-6 font-mono font-bold text-emerald-400">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{dispatch.eta}</span>
+                    </div>
+                  </td>
+
+                  {/* Status Pill */}
+                  <td className="py-4 px-6">
+                    {dispatch.status === "IN_TRANSIT" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                        In Transit
+                      </span>
+                    ) : dispatch.status === "DISPATCHED" ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        Dispatched
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Delivered
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Track Dispatch Action Button */}
+                  <td className="py-4 px-6 text-right">
+                    <button
+                      onClick={() =>
+                        router.push("/dmc/relief-resources/track/" + dispatch.id)
+                      }
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Track Dispatch</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
