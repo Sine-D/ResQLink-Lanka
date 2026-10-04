@@ -44,6 +44,10 @@ export default function RescueTeamsPage() {
   const [contactNumbers, setContactNumbers] = useState<string[]>([""]);
   const [members, setMembers] = useState<TeamMember[]>([]);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [locationFilter, setLocationFilter] = useState("All");
+
   const fetchTeams = async () => {
     try {
       const res = await fetch("/api/rescue-teams");
@@ -61,6 +65,24 @@ export default function RescueTeamsPage() {
   useEffect(() => {
     fetchTeams();
   }, []);
+
+  // Filtered teams logic
+  const uniqueLocations = Array.from(new Set(teams.map(t => t.location || t.district).filter(Boolean)));
+  
+  const filteredTeams = teams.filter(team => {
+    const matchesSearch = 
+      team.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      team.leadOfficer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (team.expertise || "").toLowerCase().includes(searchQuery.toLowerCase());
+      
+    const teamStatus = team.status || (team.isAvailable ? 'Active' : 'Inactive');
+    const matchesStatus = statusFilter === "All" || teamStatus === statusFilter;
+    
+    const teamLocation = team.location || team.district;
+    const matchesLocation = locationFilter === "All" || teamLocation === locationFilter;
+
+    return matchesSearch && matchesStatus && matchesLocation;
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -382,15 +404,31 @@ export default function RescueTeamsPage() {
               <input
                 type="text"
                 placeholder="Search..."
-                className="bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white focus:outline-none"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
               />
               <svg className="w-4 h-4 text-slate-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </div>
-            <select className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none">
-              <option>By Status</option>
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Standby">Standby</option>
+              <option value="Inactive">Inactive</option>
             </select>
-            <select className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none">
-              <option>By Location</option>
+            <select 
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+            >
+              <option value="All">All Locations</option>
+              {uniqueLocations.map((loc, idx) => (
+                <option key={idx} value={loc}>{loc}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -417,8 +455,12 @@ export default function RescueTeamsPage() {
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No rescue teams registered yet.</td>
                 </tr>
+              ) : filteredTeams.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No rescue teams match your filters.</td>
+                </tr>
               ) : (
-                teams.map((team) => (
+                filteredTeams.map((team) => (
                   <tr key={team._id} className="border-b border-slate-800/50 hover:bg-slate-800/20">
                     <td className="px-4 py-4">{team.name}</td>
                     <td className="px-4 py-4">{team.leadOfficer}</td>
