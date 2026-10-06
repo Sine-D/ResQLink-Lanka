@@ -13,7 +13,8 @@ export async function GET() {
     let teams = await RescueTeam.find({ isAvailable: true });
 
     // Seed dummy data if none exist
-    if (incidents.length === 0) {
+    const totalIncidents = await Incident.countDocuments();
+    if (totalIncidents === 0) {
       // Find a user to act as reportedBy
       let user = await User.findOne({ role: "DMC_OFFICER" });
       if (!user) {
@@ -49,7 +50,8 @@ export async function GET() {
       incidents = await Incident.find({ status: "OPEN" }).sort({ createdAt: -1 });
     }
 
-    if (teams.length === 0) {
+    const totalTeams = await RescueTeam.countDocuments();
+    if (totalTeams === 0) {
       await RescueTeam.create([
         {
           teamId: "TEAM-COLOMBO-1",
@@ -73,9 +75,60 @@ export async function GET() {
       teams = await RescueTeam.find({ isAvailable: true });
     }
 
-    return NextResponse.json({ incidents, teams });
+    const districts = [
+      "Ampara", "Anuradhapura", "Badulla", "Batticaloa", "Colombo", "Galle", "Gampaha", 
+      "Hambantota", "Jaffna", "Kalutara", "Kandy", "Kegalle", "Kilinochchi", "Kurunegala", 
+      "Mannar", "Matale", "Matara", "Moneragala", "Mullaitivu", "Nuwara Eliya", "Polonnaruwa", 
+      "Puttalam", "Ratnapura", "Trincomalee", "Vavuniya"
+    ].sort();
+
+    const incidentTitles = [
+      "Flood",
+      "Tsunami",
+      "Landslide"
+    ].sort();
+
+    return NextResponse.json({ incidents, teams, districts, incidentTitles });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to fetch incidents";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    await connectMongo();
+    const body = await request.json();
+    
+    // Generate incident ID
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const incidentId = `INC-${new Date().getFullYear()}-${randomSuffix}`;
+    
+    // Fallback reportedBy if not provided
+    let reportedBy = body.reportedBy;
+    if (!reportedBy) {
+      let user = await User.findOne({ role: "DISTRICT_OFFICER" });
+      if (!user) user = await User.findOne();
+      reportedBy = user ? user._id : new mongoose.Types.ObjectId();
+    }
+    
+    const newIncident = new Incident({
+      incidentId,
+      title: body.title,
+      district: body.district,
+      locationName: body.locationName,
+      severity: body.severity,
+      status: body.status || "OPEN",
+      trappedCount: body.trappedCount || 0,
+      description: body.description,
+      reportedBy
+    });
+    
+    const savedIncident = await newIncident.save();
+    return NextResponse.json(savedIncident, { status: 201 });
+  } catch (err: unknown) {
+    console.error("Error creating incident:", err);
+    const message = err instanceof Error ? err.message : "Failed to create incident";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -4,11 +4,31 @@ import { authOptions } from "@/lib/auth";
 import connectMongo from "@/lib/db/connectMongo";
 import RescueTeam from "@/lib/models/RescueTeam";
 
+import RescueAssignment from "@/lib/models/RescueAssignment";
+import Incident from "@/lib/models/Incident";
+
 export async function GET(request: NextRequest) {
   try {
     await connectMongo();
     const teams = await RescueTeam.find().sort({ createdAt: -1 }).lean();
-    return NextResponse.json(teams);
+    
+    // Fetch active assignments for these teams
+    const teamIds = teams.map(t => t._id);
+    const activeAssignments = await RescueAssignment.find({
+      teamId: { $in: teamIds },
+      status: "ASSIGNED"
+    }).populate('incidentId').lean();
+
+    // Attach assigned incident to the team object
+    const teamsWithAssignments = teams.map(team => {
+      const assignment = activeAssignments.find(a => String(a.teamId) === String(team._id));
+      return {
+        ...team,
+        assignedIncident: assignment ? assignment.incidentId : null
+      };
+    });
+
+    return NextResponse.json(teamsWithAssignments);
   } catch (error) {
     console.error("Error fetching rescue teams:", error);
     return NextResponse.json({ error: "Failed to fetch rescue teams" }, { status: 500 });

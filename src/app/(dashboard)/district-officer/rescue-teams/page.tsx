@@ -16,6 +16,11 @@ interface RescueTeam {
   contactNumbers?: string[];
   equipmentList?: string;
   members?: TeamMember[];
+  assignedIncident?: {
+    _id: string;
+    title: string;
+    incidentId: string;
+  } | null;
 }
 
 interface TeamMember {
@@ -495,6 +500,7 @@ export default function RescueTeamsPage() {
                 <th className="px-4 py-3 font-semibold">Members</th>
                 <th className="px-4 py-3 font-semibold">Location</th>
                 <th className="px-4 py-3 font-semibold">Expertise</th>
+                <th className="px-4 py-3 font-semibold">Assignment</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold text-center rounded-tr-lg">Action</th>
               </tr>
@@ -502,15 +508,15 @@ export default function RescueTeamsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">Loading teams...</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading teams...</td>
                 </tr>
               ) : teams.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No rescue teams registered yet.</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">No rescue teams registered yet.</td>
                 </tr>
               ) : filteredTeams.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No rescue teams match your filters.</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">No rescue teams match your filters.</td>
                 </tr>
               ) : (
                 filteredTeams.map((team) => (
@@ -520,6 +526,16 @@ export default function RescueTeamsPage() {
                     <td className="px-4 py-4">{team.memberCount}</td>
                     <td className="px-4 py-4">{team.location || team.district}</td>
                     <td className="px-4 py-4">{team.expertise || "-"}</td>
+                    <td className="px-4 py-4">
+                      {team.assignedIncident ? (
+                        <span className="text-blue-400 text-xs font-medium">
+                          {team.assignedIncident.title} <br/>
+                          <span className="text-slate-500">({team.assignedIncident.incidentId})</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs">Unassigned</span>
+                      )}
+                    </td>
                     <td className="px-4 py-4">
                       {getStatusBadge(team)}
                     </td>

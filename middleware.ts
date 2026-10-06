@@ -27,7 +27,7 @@ export async function middleware(req: NextRequest) {
       if (token.role === "DMC_OFFICER") {
         return NextResponse.redirect(new URL("/dmc/warnings", req.url));
       } else if (token.role === "DISTRICT_OFFICER") {
-        return NextResponse.redirect(new URL("/district-officer/incidents", req.url));
+        return NextResponse.redirect(new URL("/district-officer", req.url));
       } else {
         return NextResponse.redirect(new URL("/citizen/alerts", req.url));
       }
