@@ -22,7 +22,7 @@ interface RescueTeam {
   memberCount: number;
 }
 
-const INCIDENT_TITLES = ["Flood", "Tsunami", "Landslide"];
+const INCIDENT_TITLES = ["Flood", "Tsunami", "Landslide", "Fire", "Strong Winds", "Droughts", "Earth Tremors", "Lightning Strikes", "Tropical Cyclones"];
 
 export default function IncidentsManagementPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
