@@ -254,7 +254,7 @@ export default function IncidentsManagementPage() {
       ) : (
         <div className="space-y-4">
           {incidents.map((incident) => {
-            const isDispatched = dispatchedIncidents.includes(incident.incidentId);
+            const isDispatched = incident.status === "DISPATCHED" || dispatchedIncidents.includes(incident.incidentId);
             const teamId = selectedTeams[incident.incidentId];
 
             return (
@@ -293,7 +293,7 @@ export default function IncidentsManagementPage() {
                 {isDispatched ? (
                   <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 mt-4">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Rescue Team #{teamId} Dispatched to Scene!</span>
+                    <span>{teamId ? `Rescue Team #${teamId} Dispatched to Scene!` : `Rescue Team Dispatched to Scene!`}</span>
                   </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 pt-4 mt-2 border-t border-slate-800/50">

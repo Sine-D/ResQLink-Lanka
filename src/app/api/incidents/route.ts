@@ -9,8 +9,8 @@ export async function GET() {
   try {
     await connectMongo();
 
-    let incidents = await Incident.find({ status: "OPEN" }).sort({ createdAt: -1 });
-    let teams = await RescueTeam.find({ isAvailable: true });
+    let incidents = await Incident.find({ status: { $in: ["OPEN", "DISPATCHED"] } }).sort({ createdAt: -1 });
+    let teams = await RescueTeam.find({});
 
     // Seed dummy data if none exist
     const totalIncidents = await Incident.countDocuments();
@@ -47,7 +47,7 @@ export async function GET() {
           reportedBy: reportedBy,
         }
       ]);
-      incidents = await Incident.find({ status: "OPEN" }).sort({ createdAt: -1 });
+      incidents = await Incident.find({ status: { $in: ["OPEN", "DISPATCHED"] } }).sort({ createdAt: -1 });
     }
 
     const totalTeams = await RescueTeam.countDocuments();
@@ -72,7 +72,7 @@ export async function GET() {
           contactNo: "0777654321"
         }
       ]);
-      teams = await RescueTeam.find({ isAvailable: true });
+      teams = await RescueTeam.find({});
     }
 
     const districts = [
