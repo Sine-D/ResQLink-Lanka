@@ -11,12 +11,14 @@ export interface IHazardReport extends Document {
   coordinates: {
     latitude: number;
     longitude: number;
+    accuracy?: number;
   };
   description: string;
   photoUrl?: string;
   status: HazardReportStatus;
   verifiedBy?: mongoose.Types.ObjectId;
   verificationNotes?: string;
+  reviewedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +32,7 @@ const HazardReportSchema = new Schema<IHazardReport>(
     coordinates: {
       latitude: { type: Number, required: true },
       longitude: { type: Number, required: true },
+      accuracy: { type: Number, required: false },
     },
     description: { type: String, required: true },
     photoUrl: { type: String },
@@ -40,6 +43,7 @@ const HazardReportSchema = new Schema<IHazardReport>(
     },
     verifiedBy: { type: Schema.Types.ObjectId, ref: "User" },
     verificationNotes: { type: String },
+    reviewedAt: { type: Date },
   },
   { timestamps: true }
 );

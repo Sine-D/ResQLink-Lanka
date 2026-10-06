@@ -15,7 +15,9 @@ import {
   LogOut,
   User,
   AlertTriangle,
+  ClipboardClock,
 } from "lucide-react";
+import HazardSyncManager from "@/components/hazard/HazardSyncManager";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -25,11 +27,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isDmc = userRole === "DMC_OFFICER";
   const isDistrictOfficer = userRole === "DISTRICT_OFFICER";
+  const isHazardReport = pathname === "/citizen/report-hazard";
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100">
+    <div
+      className={
+        isHazardReport
+          ? "min-h-screen bg-slate-100"
+          : "min-h-screen flex bg-slate-950 text-slate-100"
+      }
+    >
       {/* Sidebar Nav */}
-      <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4 shrink-0">
+      <aside
+        className={`${isHazardReport ? "hidden" : "flex"} w-64 bg-slate-900 border-r border-slate-800 flex-col justify-between p-4 shrink-0`}
+      >
         <div className="space-y-6">
           <Link href="/" className="flex items-center gap-2.5 px-2">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center text-white shadow-md shadow-red-600/30">
@@ -83,14 +94,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   href="/dmc/hazard-reports"
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                     pathname.startsWith("/dmc/hazard-reports")
-                      ? "bg-slate-800 text-white"
+                      ? "bg-red-600 text-white shadow-md shadow-red-600/30"
                       : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                   }`}
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   <span>Hazard Verifications</span>
-                  <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
-                    STUB
+                  <span className="ml-auto text-[9px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-800">
+                    FULL
                   </span>
                 </Link>
 
@@ -133,14 +144,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   href="/citizen/report-hazard"
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                     pathname === "/citizen/report-hazard"
-                      ? "bg-slate-800 text-white"
+                      ? "bg-red-600 text-white shadow-md shadow-red-600/30"
                       : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                   }`}
                 >
                   <AlertTriangle className="w-4 h-4" />
                   <span>Report a Hazard</span>
-                  <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
-                    STUB
+                  <span className="ml-auto text-[9px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-800">
+                    FULL
+                  </span>
+                </Link>
+
+                <Link
+                  href="/citizen/hazard-reports"
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    pathname === "/citizen/hazard-reports"
+                      ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                  }`}
+                >
+                  <ClipboardClock className="w-4 h-4" />
+                  <span>My Hazard Reports</span>
+                  <span className="ml-auto text-[9px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-800">
+                    FULL
                   </span>
                 </Link>
               </>
@@ -189,7 +215,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content Viewport */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl">{children}</main>
+      <main
+        className={
+          isHazardReport
+            ? "min-h-screen w-full overflow-y-auto"
+            : "flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl"
+        }
+      >
+        {children}
+      </main>
+      {!isDmc && !isDistrictOfficer && <HazardSyncManager />}
     </div>
   );
 }

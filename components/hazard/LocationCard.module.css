@@ -1,0 +1,65 @@
+.locationButton {
+  display: flex;
+  width: 100%;
+  height: 43px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border: 1px solid #dfe7f0;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #46566d;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  box-shadow: 0 1px 4px rgb(32 54 86 / 5%);
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.locationButton:hover {
+  border-color: #8bb8f8;
+}
+
+.locationButton:focus-visible {
+  border-color: #1976f3;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgb(25 118 243 / 12%);
+}
+
+.locationButton:disabled {
+  cursor: wait;
+}
+
+.locationButton svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: #1879f5;
+}
+
+.spinner {
+  animation: spin 800ms linear infinite;
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 7px;
+  color: #bd3030;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.error svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
