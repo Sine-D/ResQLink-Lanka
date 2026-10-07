@@ -79,8 +79,8 @@ export default function RescueTeamsPage() {
   
   const filteredTeams = teams.filter(team => {
     const matchesSearch = 
-      team.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      team.leadOfficer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (team.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (team.leadOfficer || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (team.expertise || "").toLowerCase().includes(searchQuery.toLowerCase());
       
     const teamStatus = team.status || (team.isAvailable ? 'Active' : 'Inactive');
