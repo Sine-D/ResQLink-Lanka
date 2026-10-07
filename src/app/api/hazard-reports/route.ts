@@ -85,124 +85,221 @@ export async function POST(req: Request) {
     const body =
       await req.json();
 
-    const description =
-      typeof body.description === "string"
-        ? body.description.trim()
-        : "";
+const description =
+  typeof body.description === "string"
+    ? body.description.trim()
+    : "";
 
-    const latitude = Number(
-      body.coordinates?.latitude ?? body.coordinates?.lat
+const hazardType =
+  typeof body.hazardType === "string"
+    ? body.hazardType
+    : "";
+
+const allowedHazards = [
+  "Flood",
+  "Landslide",
+  "Tsunami",
+  "Storm",
+  "Fire",
+];
+
+const locationSource =
+  body.locationSource === "MANUAL"
+    ? "MANUAL"
+    : "GPS";
+
+const locationName =
+  typeof body.locationName === "string"
+    ? body.locationName.trim()
+    : "";
+
+const latitude = Number(
+  body.coordinates?.latitude ??
+    body.coordinates?.lat
+);
+
+const longitude = Number(
+  body.coordinates?.longitude ??
+    body.coordinates?.lng
+);
+
+const accuracyValue = Number(
+  body.coordinates?.accuracy
+);
+
+const accuracy =
+  Number.isFinite(accuracyValue)
+    ? Math.max(0, accuracyValue)
+    : undefined;
+
+const photoUrl =
+  typeof body.photoUrl === "string"
+    ? body.photoUrl.trim()
+    : "";
+
+const clientReportId =
+  typeof body.clientReportId === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    body.clientReportId
+  )
+    ? body.clientReportId
+    : crypto.randomUUID();
+
+if (
+  !description ||
+  description.length > 500 ||
+  !allowedHazards.includes(hazardType)
+) {
+  return NextResponse.json(
+    {
+      error:
+        "A valid hazard type and description are required",
+    },
+    {
+      status: 400,
+    }
+  );
+}
+
+if (locationSource === "GPS") {
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Valid GPS coordinates are required",
+      },
+      {
+        status: 400,
+      }
     );
+  }
+}
 
-    const longitude = Number(
-      body.coordinates?.longitude ?? body.coordinates?.lng
+if (
+  locationSource === "MANUAL" &&
+  locationName.length < 3
+) {
+  return NextResponse.json(
+    {
+      error:
+        "Please provide a valid location description",
+    },
+    {
+      status: 400,
+    }
+  );
+}
+
+/*
+ * Photo evidence is OPTIONAL.
+ * But if the user supplies one, validate it.
+ */
+if (photoUrl) {
+  const dataImageMatch = photoUrl.match(
+    /^data:image\/(jpeg|jpg|png|webp);base64,(.+)$/i
+  );
+
+  const remoteImage =
+    /^https?:\/\//i.test(photoUrl);
+
+  if (!dataImageMatch && !remoteImage) {
+    return NextResponse.json(
+      {
+        error:
+          "The attached evidence must be a valid image",
+      },
+      {
+        status: 400,
+      }
     );
+  }
 
-    const accuracyValue = Number(body.coordinates?.accuracy);
-    const accuracy = Number.isFinite(accuracyValue)
-      ? Math.max(0, accuracyValue)
-      : undefined;
+  if (dataImageMatch) {
+    const base64 = dataImageMatch[2];
 
-    const locationName =
-      typeof body.locationName === "string" && body.locationName.trim()
-        ? body.locationName.trim()
-        : "Live GPS location";
+    const approximateBytes =
+      Math.ceil(
+        (base64.length * 3) / 4
+      );
 
-    const photoUrl =
-      typeof body.photoUrl === "string"
-        ? body.photoUrl
-        : "";
+    const fiveMB =
+      5 * 1024 * 1024;
 
-    const allowedHazards = ["Flood", "Landslide", "Tsunami", "Storm", "Fire"];
-    const hazardType = typeof body.hazardType === "string" ? body.hazardType : "";
-    const clientReportId =
-      typeof body.clientReportId === "string" &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.clientReportId)
-        ? body.clientReportId
-        : crypto.randomUUID();
-
-    if (
-      !description ||
-      description.length > 500 ||
-      !allowedHazards.includes(hazardType) ||
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude) ||
-      latitude < -90 ||
-      latitude > 90 ||
-      longitude < -180 ||
-      longitude > 180
-    ) {
+    if (approximateBytes > fiveMB) {
       return NextResponse.json(
-        { error: "Valid hazard type, description, and GPS coordinates are required" },
-        { status: 400 }
+        {
+          error:
+            "The evidence photo must be smaller than 5 MB",
+        },
+        {
+          status: 400,
+        }
       );
     }
+  }
+}
 
-    if (
-      !photoUrl ||
-      !/^(data:image\/(jpeg|jpg|png|webp|heic);base64,|https?:\/\/)/i.test(photoUrl) ||
-      photoUrl.length > 5 * 1024 * 1024
-    ) {
-      return NextResponse.json(
-        { error: "A valid evidence photo smaller than 3 MB is required" },
-        { status: 400 }
-      );
-    }
+await connectMongo();
 
+const existingReport =
+  await HazardReport.findOne({
+    reportId: clientReportId,
+    reporterId,
+  });
 
+if (existingReport) {
+  return NextResponse.json({
+    message:
+      "Hazard report already synchronized",
 
-    await connectMongo();
+    report: existingReport,
+  });
+}
 
-    const existingReport = await HazardReport.findOne({ reportId: clientReportId, reporterId });
+const report =
+  await HazardReport.create({
+    reportId: clientReportId,
 
-    if (existingReport) {
-      return NextResponse.json({
-        message: "Hazard report already synchronized",
-        report: existingReport,
-      });
-    }
+    reporterId,
 
+    hazardType,
 
+    locationName:
+      locationName ||
+      "Live GPS location",
 
-    const report =
-      await HazardReport.create({
+    locationSource,
 
-        reportId:
-          clientReportId,
-
-
-        reporterId:
-          reporterId,
-
-
-        hazardType:
-          hazardType,
-
-
-        locationName:
-          locationName,
-
-
-        coordinates:
-          {
+    ...(locationSource === "GPS"
+      ? {
+          coordinates: {
             latitude,
             longitude,
-            accuracy
+            accuracy,
           },
+        }
+      : {}),
 
+    description,
 
-        description:
-          description,
-
-
-        photoUrl:
+    ...(photoUrl
+      ? {
           photoUrl,
+        }
+      : {}),
 
+    status:
+      "PENDING_VERIFICATION",
 
-        status:
-          "PENDING_VERIFICATION"
-
-      });
+    clarifications: [],
+  });
 
 
 

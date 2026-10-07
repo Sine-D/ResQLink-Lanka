@@ -4,7 +4,10 @@ import {
   getHazardReportById,
   rejectHazardReport,
   verifyHazardReport,
+  requestAdditionalInformation,
+  respondToInformationRequest,
 } from "../../lib/services/hazardReportService";
+
 
 jest.mock("../../lib/models/HazardReport");
 
@@ -175,4 +178,208 @@ describe("Hazard Report Service (Member 2)", () => {
       "Rejection update failed"
     );
   });
+
+  test(
+  "requests additional information for a pending report",
+  async () => {
+    const updated = {
+      reportId: "report-info-1",
+      status:
+        "MORE_INFO_REQUIRED",
+    };
+
+    (
+      HazardReport.findOneAndUpdate as jest.Mock
+    ).mockResolvedValue(updated);
+
+    await expect(
+      requestAdditionalInformation(
+        "report-info-1",
+        "officer-1",
+        "Please confirm whether the road is blocked"
+      )
+    ).resolves.toEqual(updated);
+
+    expect(
+      HazardReport.findOneAndUpdate
+    ).toHaveBeenCalledWith(
+      {
+        reportId:
+          "report-info-1",
+        status:
+          "PENDING_VERIFICATION",
+      },
+
+      expect.objectContaining({
+        $set: {
+          status:
+            "MORE_INFO_REQUIRED",
+        },
+
+        $push:
+          expect.objectContaining({
+            clarifications:
+              expect.objectContaining({
+                requestedBy:
+                  "officer-1",
+
+                requestMessage:
+                  "Please confirm whether the road is blocked",
+
+                requestedAt:
+                  expect.any(Date),
+              }),
+          }),
+      }),
+
+      {
+        new: true,
+      }
+    );
+  }
+);
+
+test(
+  "trims additional information request",
+  async () => {
+    (
+      HazardReport.findOneAndUpdate as jest.Mock
+    ).mockResolvedValue({
+      status:
+        "MORE_INFO_REQUIRED",
+    });
+
+    await requestAdditionalInformation(
+      "report-info-2",
+      "officer-2",
+      "  Is the road completely blocked?  "
+    );
+
+    expect(
+      HazardReport.findOneAndUpdate
+    ).toHaveBeenCalledWith(
+      expect.any(Object),
+
+      expect.objectContaining({
+        $push:
+          expect.objectContaining({
+            clarifications:
+              expect.objectContaining({
+                requestMessage:
+                  "Is the road completely blocked?",
+              }),
+          }),
+      }),
+
+      {
+        new: true,
+      }
+    );
+  }
+);
+
+test(
+  "rejects an empty information request",
+  async () => {
+    await expect(
+      requestAdditionalInformation(
+        "report-info-3",
+        "officer-3",
+        "   "
+      )
+    ).rejects.toThrow(
+      "Additional information request cannot be empty"
+    );
+  }
+);
+
+test(
+  "stores citizen clarification and returns report to pending verification",
+  async () => {
+    const updated = {
+      reportId:
+        "report-response-1",
+
+      status:
+        "PENDING_VERIFICATION",
+    };
+
+    (
+      HazardReport.findOneAndUpdate as jest.Mock
+    ).mockResolvedValue(updated);
+
+    await expect(
+      respondToInformationRequest(
+        "report-response-1",
+        "citizen-1",
+        "The road is completely blocked."
+      )
+    ).resolves.toEqual(updated);
+
+    expect(
+      HazardReport.findOneAndUpdate
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reportId:
+          "report-response-1",
+
+        reporterId:
+          "citizen-1",
+
+        status:
+          "MORE_INFO_REQUIRED",
+      }),
+
+      expect.objectContaining({
+        $set:
+          expect.objectContaining({
+            "clarifications.$[pending].citizenResponse":
+              "The road is completely blocked.",
+
+            status:
+              "PENDING_VERIFICATION",
+          }),
+      }),
+
+      expect.objectContaining({
+        new: true,
+
+        arrayFilters:
+          expect.any(Array),
+      })
+    );
+  }
+);
+
+test(
+  "rejects empty citizen clarification",
+  async () => {
+    await expect(
+      respondToInformationRequest(
+        "report-response-2",
+        "citizen-1",
+        "   "
+      )
+    ).rejects.toThrow(
+      "Additional information response cannot be empty"
+    );
+  }
+);
+
+test(
+  "returns null if citizen has no open information request",
+  async () => {
+    (
+      HazardReport.findOneAndUpdate as jest.Mock
+    ).mockResolvedValue(null);
+
+    await expect(
+      respondToInformationRequest(
+        "report-response-3",
+        "citizen-1",
+        "Additional details"
+      )
+    ).resolves.toBeNull();
+  }
+);
 });

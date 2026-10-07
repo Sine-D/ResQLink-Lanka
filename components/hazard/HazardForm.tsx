@@ -23,6 +23,8 @@ import {
 export default function HazardForm() {
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState<File | null>(null);
+  const [locationMode, setLocationMode] = useState<"GPS" | "MANUAL">("GPS");
+  const [manualLocation, setManualLocation] = useState("");
   const [location, setLocation] = useState<GpsLocation | null>(null);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
@@ -76,15 +78,15 @@ export default function HazardForm() {
   function handleImage(event: ChangeEvent<HTMLInputElement>) {
     const selectedImage = event.target.files?.[0] ?? null;
 
-    if (selectedImage && !selectedImage.type.startsWith("image/")) {
+    if (selectedImage && !["image/jpeg", "image/png", "image/webp"].includes(selectedImage.type)) {
       setFeedback({ type: "error", message: "Please choose a valid image file." });
       event.target.value = "";
       setImage(null);
       return;
     }
 
-    if (selectedImage && selectedImage.size > 10 * 1024 * 1024) {
-      setFeedback({ type: "error", message: "The evidence photo must be smaller than 10 MB." });
+    if (selectedImage && selectedImage.size > 5 * 1024 * 1024) {
+      setFeedback({ type: "error", message: "The evidence photo must be smaller than 5 MB." });
       event.target.value = "";
       setImage(null);
       return;
@@ -93,6 +95,7 @@ export default function HazardForm() {
     setFeedback(null);
     setImage(selectedImage);
   }
+  
 
   function readImageAsDataUrl(file: File) {
     return new Promise<string>((resolve, reject) => {
@@ -111,12 +114,15 @@ export default function HazardForm() {
       setFeedback({ type: "error", message: "Please complete all required fields." });
       return;
     }
-    if (!image) {
-      setFeedback({ type: "error", message: "Please capture or choose an evidence photo." });
+    if (locationMode === "GPS" && !location) {
+      setFeedback({
+        type: "error",
+        message: "Please capture your current location or use manual location entry.",
+      });
       return;
     }
-    if (!location) {
-      setFeedback({ type: "error", message: "Please capture your current GPS location before submitting." });
+    if (locationMode === "MANUAL" && manualLocation.trim().length < 3) {
+      setFeedback({ type: "error", message: "Please provide your location." });
       return;
     }
 
@@ -126,6 +132,8 @@ export default function HazardForm() {
   function resetReportForm() {
     setForm((current) => ({ ...current, description: "" }));
     setLocation(null);
+    setManualLocation("");
+    setLocationMode("GPS");
     setImage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -140,18 +148,21 @@ export default function HazardForm() {
   }
 
   async function submitReport() {
-    if (!location || !image) return;
+    if (locationMode === "GPS" && !location) return;
+    if (locationMode === "MANUAL" && !manualLocation.trim()) return;
+
     setLoading(true);
 
     try {
-      const photoUrl = await readImageAsDataUrl(image);
+      const photoUrl = image ? await readImageAsDataUrl(image) : undefined;
       const payload: HazardReportSubmission = {
         clientReportId: crypto.randomUUID(),
         hazardType: form.hazardType,
         description: form.description.trim(),
-        locationName: "Live GPS location",
-        coordinates: location,
-        photoUrl,
+        locationSource: locationMode,
+        locationName: locationMode === "GPS" ? "Live GPS location" : manualLocation.trim(),
+        ...(locationMode === "GPS" && location ? { coordinates: location } : {}),
+        ...(photoUrl ? { photoUrl } : {}),
       };
 
       if (!navigator.onLine) {
@@ -238,11 +249,15 @@ export default function HazardForm() {
       </div>
 
       <div className={styles.field}>
-        <label htmlFor="evidence-photo" className={styles.label}>Photo Attachment</label>
+        <label htmlFor="evidence-photo" className={styles.label}>Photo Evidence (Optional)</label>
+        <p className={styles.safetyNote}>
+          Only attach a photo if it is safe to do so. Do not approach or remain near a dangerous
+          area just to capture evidence.
+        </p>
         <label htmlFor="evidence-photo" className={styles.upload}>
           <Camera aria-hidden="true" />
           <span className={styles.uploadTitle}>Add Photo</span>
-          <span className={styles.uploadHint}>JPEG, PNG up to 10MB</span>
+          <span className={styles.uploadHint}>JPEG, PNG or WebP up to 5 MB</span>
           <input
             id="evidence-photo"
             ref={fileInputRef}
@@ -262,13 +277,64 @@ export default function HazardForm() {
       </div>
 
       <div className={styles.field}>
-        <span className={styles.label}>Location</span>
-        <LocationCard
-          location={location}
-          locating={locating}
-          error={locationError}
-          onLocate={captureCurrentLocation}
-        />
+        <fieldset className={styles.locationFieldset}>
+          <legend className={styles.label}>Location</legend>
+          <div className={styles.locationModes}>
+            <button
+              type="button"
+              onClick={() => {
+                setLocationMode("GPS");
+                setFeedback(null);
+              }}
+              aria-pressed={locationMode === "GPS"}
+              className={`rounded-lg border px-3 py-2 text-xs font-bold ${
+                locationMode === "GPS"
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-slate-200 bg-white text-slate-500"
+              }`}
+            >
+              Use GPS
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLocationMode("MANUAL");
+                setFeedback(null);
+              }}
+              aria-pressed={locationMode === "MANUAL"}
+              className={`rounded-lg border px-3 py-2 text-xs font-bold ${
+                locationMode === "MANUAL"
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-slate-200 bg-white text-slate-500"
+              }`}
+            >
+              Enter Manually
+            </button>
+          </div>
+          {locationMode === "GPS" ? (
+            <LocationCard
+              location={location}
+              locating={locating}
+              error={locationError}
+              onLocate={captureCurrentLocation}
+            />
+          ) : (
+            <input
+              id="manual-location"
+              className={styles.control}
+              type="text"
+              minLength={3}
+              maxLength={150}
+              style={{ height: 43, padding: "0 12px" }}
+              placeholder="e.g. Near Kelani Bridge, Peliyagoda"
+              value={manualLocation}
+              onChange={(event) => {
+                setFeedback(null);
+                setManualLocation(event.target.value);
+              }}
+            />
+          )}
+        </fieldset>
       </div>
 
       {feedback && (
@@ -289,7 +355,7 @@ export default function HazardForm() {
         Submit Report
       </button>
 
-      {showConfirmation && location && image && (
+      {showConfirmation && (
         <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-labelledby="confirm-report-title">
           <div className={styles.modal}>
             <div className={styles.modalHeader}>
@@ -309,13 +375,15 @@ export default function HazardForm() {
               <ConfirmationItem label="Hazard type" value={form.hazardType} />
               <ConfirmationItem label="Description" value={form.description.trim()} />
               <ConfirmationItem
-                label="GPS location"
-                value={`${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (±${Math.round(location.accuracy)} m)`}
+                label={locationMode === "GPS" ? "GPS location" : "Manual location"}
+                value={locationMode === "GPS" && location
+                  ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (±${Math.round(location.accuracy)} m)`
+                  : manualLocation.trim()}
                 icon={<MapPin aria-hidden="true" />}
               />
               <ConfirmationItem
                 label="Evidence photo"
-                value={`${image.name} · ${(image.size / 1024 / 1024).toFixed(2)} MB`}
+                value={image ? `${image.name} · ${(image.size / 1024 / 1024).toFixed(2)} MB` : "No photo attached"}
                 icon={<Camera aria-hidden="true" />}
               />
             </div>

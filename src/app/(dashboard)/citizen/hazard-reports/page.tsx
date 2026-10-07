@@ -17,7 +17,7 @@ export default async function CitizenHazardReportsPage() {
 
   await connectMongo();
   const reports = await HazardReport.find({ reporterId })
-    .select("reportId hazardType locationName coordinates description status verificationNotes photoUrl createdAt updatedAt")
+    .select("reportId hazardType locationName locationSource coordinates description status verificationNotes photoUrl clarifications createdAt updatedAt")
     .sort({ createdAt: -1 })
     .lean();
 
