@@ -98,7 +98,9 @@ export default function PendingSyncReports() {
                 </div>
                 <p className="mt-2 flex items-center gap-1.5 font-mono text-xs text-slate-400">
                   <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                  {report.coordinates.latitude.toFixed(5)}, {report.coordinates.longitude.toFixed(5)}
+                  {report.coordinates
+                    ? `${report.coordinates.latitude.toFixed(5)}, ${report.coordinates.longitude.toFixed(5)}`
+                    : report.locationName}
                 </p>
               </div>
               <div className="text-left text-xs text-slate-500 sm:text-right">

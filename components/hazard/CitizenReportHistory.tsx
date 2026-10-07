@@ -1,18 +1,29 @@
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, Clock3, FileText, Inbox, MapPin, Plus, XCircle } from "lucide-react";
+import ClarificationResponse from "./ClarificationResponse";
 import StatusBadge from "./StatusBadge";
 
 interface CitizenReport {
   reportId: string;
   hazardType: string;
   locationName: string;
-  coordinates: {
+  coordinates?: {
     latitude: number;
     longitude: number;
     accuracy?: number;
   };
   description: string;
-  status: "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";
+  status:
+  | "PENDING_VERIFICATION"
+  | "MORE_INFO_REQUIRED"
+  | "VERIFIED"
+  | "REJECTED";
+  clarifications?: {
+    requestMessage: string;
+    requestedAt: string;
+    citizenResponse?: string;
+    respondedAt?: string;
+  }[];
   verificationNotes?: string;
   photoUrl?: string;
   createdAt: string;
@@ -59,7 +70,13 @@ export default function CitizenReportHistory({ reports }: { reports: CitizenRepo
           </div>
         ) : (
           <div className="divide-y divide-slate-800">
-            {reports.map((report) => (
+            {reports.map((report) => {
+              const pendingRequest = [...(report.clarifications ?? [])]
+                .reverse()
+                .find((item) => !item.citizenResponse);
+              const coordinates = report.coordinates;
+
+              return (
               <article key={report.reportId} className="p-5 transition hover:bg-slate-800/30 sm:p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
@@ -70,7 +87,8 @@ export default function CitizenReportHistory({ reports }: { reports: CitizenRepo
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
                       <span className="inline-flex items-center gap-1.5">
                         <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                        {report.locationName} · {report.coordinates.latitude.toFixed(5)}, {report.coordinates.longitude.toFixed(5)}
+                        {report.locationName}
+                        {coordinates && ` · ${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)}`}
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -95,8 +113,15 @@ export default function CitizenReportHistory({ reports }: { reports: CitizenRepo
                 </div>
 
                 <StatusMessage report={report} />
+                {report.status === "MORE_INFO_REQUIRED" && pendingRequest && (
+                  <ClarificationResponse
+                    reportId={report.reportId}
+                    requestMessage={pendingRequest.requestMessage}
+                  />
+                )}
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -147,7 +172,8 @@ function StatusMessage({ report }: { report: CitizenReport }) {
     );
   }
 
-  return (
+  if (report.status === "REJECTED") {
+    return (
     <p className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs leading-5 text-red-200">
       <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" aria-hidden="true" />
       <span>
@@ -155,5 +181,8 @@ function StatusMessage({ report }: { report: CitizenReport }) {
         {report.verificationNotes || "The DMC could not verify this report."}
       </span>
     </p>
-  );
+    );
+  }
+
+  return null;
 }

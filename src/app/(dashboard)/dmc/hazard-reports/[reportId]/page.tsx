@@ -54,9 +54,11 @@ export default async function Page({ params }: { params: Promise<{ reportId: str
             <InfoCard
               icon={Crosshair}
               label="GPS coordinates"
-              value={`${report.coordinates.latitude.toFixed(6)}, ${report.coordinates.longitude.toFixed(6)}${
-                report.coordinates.accuracy ? ` (±${Math.round(report.coordinates.accuracy)} m)` : ""
-              }`}
+              value={report.coordinates
+                ? `${report.coordinates.latitude.toFixed(6)}, ${report.coordinates.longitude.toFixed(6)}${
+                    report.coordinates.accuracy ? ` (±${Math.round(report.coordinates.accuracy)} m)` : ""
+                  }`
+                : "Not provided (manual location)"}
               accent="text-emerald-400"
             />
             <InfoCard icon={CalendarClock} label="Submitted" value={submittedAt} accent="text-sky-400" />
@@ -94,6 +96,49 @@ export default async function Page({ params }: { params: Promise<{ reportId: str
             </div>
             <p className="whitespace-pre-wrap text-sm leading-7 text-slate-300">{report.description}</p>
           </div>
+
+          {report.clarifications?.length > 0 && (
+            <section className="space-y-3" aria-labelledby="clarification-history-title">
+              <h2 id="clarification-history-title" className="text-sm font-bold text-white">
+                Additional information history
+              </h2>
+              {[...report.clarifications].reverse().map((clarification, index) => (
+                <article
+                  key={`${clarification.requestedAt.toISOString()}-${index}`}
+                  className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5"
+                >
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-300">
+                    DMC request
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-blue-100">
+                    {clarification.requestMessage}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {new Intl.DateTimeFormat("en-LK", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(clarification.requestedAt))}
+                  </p>
+                  <div className="mt-4 border-t border-blue-500/15 pt-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Citizen response
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">
+                      {clarification.citizenResponse || "Awaiting citizen response."}
+                    </p>
+                    {clarification.respondedAt && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        {new Intl.DateTimeFormat("en-LK", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(clarification.respondedAt))}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </section>
+          )}
 
           <div>
             <h2 className="mb-3 text-sm font-bold text-white">Evidence photo</h2>

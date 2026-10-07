@@ -3,9 +3,17 @@ interface Props {
 }
 
 const styles: Record<string, string> = {
-  PENDING_VERIFICATION: "border-amber-500/20 bg-amber-500/10 text-amber-300",
-  VERIFIED: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
-  REJECTED: "border-red-500/20 bg-red-500/10 text-red-300",
+  PENDING_VERIFICATION:
+    "border-amber-500/20 bg-amber-500/10 text-amber-300",
+
+  MORE_INFO_REQUIRED:
+    "border-blue-500/20 bg-blue-500/10 text-blue-300",
+
+  VERIFIED:
+    "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+
+  REJECTED:
+    "border-red-500/20 bg-red-500/10 text-red-300",
 };
 
 export default function StatusBadge({ status }: Props) {
