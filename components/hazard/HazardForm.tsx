@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   WifiOff,
   X,
+  TriangleAlert,
 } from "lucide-react";
 import LocationCard, { GpsLocation } from "./LocationCard";
 import styles from "./HazardForm.module.css";
@@ -205,8 +206,17 @@ export default function HazardForm() {
 
   return (
     <form onSubmit={reviewReport} className={styles.form}>
+      <div className={styles.formHeading}>
+        <span className={styles.formHeadingIcon}><TriangleAlert aria-hidden="true" /></span>
+        <div>
+          <h2>Incident details</h2>
+          <p>Tell us what is happening and where.</p>
+        </div>
+        <span className={styles.requiredNote}><i aria-hidden="true" /> Required fields</span>
+      </div>
+
       <div className={styles.field}>
-        <label htmlFor="hazard-type" className={styles.label}>Hazard Type</label>
+        <label htmlFor="hazard-type" className={styles.label}>Hazard type <span>Required</span></label>
         <div className={styles.selectWrap}>
           <span className={styles.hazardDot} aria-hidden="true" />
           <select
@@ -230,7 +240,7 @@ export default function HazardForm() {
 
       <div className={styles.field}>
         <div className={styles.labelRow}>
-          <label htmlFor="hazard-description" className={styles.label}>Description</label>
+          <label htmlFor="hazard-description" className={styles.label}>Description <span>Required</span></label>
           <span className={styles.counter}>{form.description.length}/500</span>
         </div>
         <textarea
@@ -239,7 +249,7 @@ export default function HazardForm() {
           rows={4}
           maxLength={500}
           required
-          placeholder="Severe riverbank overflow reported near residential sector 4. Water level is rising..."
+          placeholder="Describe what you observed, when it started, and whether people or access routes are at risk."
           value={form.description}
           onChange={(event) => {
             setFeedback(null);
@@ -249,7 +259,7 @@ export default function HazardForm() {
       </div>
 
       <div className={styles.field}>
-        <label htmlFor="evidence-photo" className={styles.label}>Photo Evidence (Optional)</label>
+        <label htmlFor="evidence-photo" className={styles.label}>Photo evidence <span>Optional</span></label>
         <p className={styles.safetyNote}>
           Only attach a photo if it is safe to do so. Do not approach or remain near a dangerous
           area just to capture evidence.
@@ -272,6 +282,17 @@ export default function HazardForm() {
           <p className={styles.fileSelected}>
             <FileCheck2 aria-hidden="true" />
             <span>{image.name}</span>
+            <button
+              type="button"
+              className={styles.removePhoto}
+              onClick={() => {
+                setImage(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              aria-label="Remove selected photo"
+            >
+              <X aria-hidden="true" />
+            </button>
           </p>
         )}
       </div>
@@ -287,11 +308,7 @@ export default function HazardForm() {
                 setFeedback(null);
               }}
               aria-pressed={locationMode === "GPS"}
-              className={`rounded-lg border px-3 py-2 text-xs font-bold ${
-                locationMode === "GPS"
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-500"
-              }`}
+              className={`${styles.modeButton} ${locationMode === "GPS" ? styles.modeButtonActive : ""}`}
             >
               Use GPS
             </button>
@@ -302,11 +319,7 @@ export default function HazardForm() {
                 setFeedback(null);
               }}
               aria-pressed={locationMode === "MANUAL"}
-              className={`rounded-lg border px-3 py-2 text-xs font-bold ${
-                locationMode === "MANUAL"
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-500"
-              }`}
+              className={`${styles.modeButton} ${locationMode === "MANUAL" ? styles.modeButtonActive : ""}`}
             >
               Enter Manually
             </button>
@@ -321,11 +334,10 @@ export default function HazardForm() {
           ) : (
             <input
               id="manual-location"
-              className={styles.control}
+              className={`${styles.control} ${styles.manualLocation}`}
               type="text"
               minLength={3}
               maxLength={150}
-              style={{ height: 43, padding: "0 12px" }}
               placeholder="e.g. Near Kelani Bridge, Peliyagoda"
               value={manualLocation}
               onChange={(event) => {
@@ -338,7 +350,7 @@ export default function HazardForm() {
       </div>
 
       {feedback && (
-        <div role="status" className={`${styles.feedback} ${styles[feedback.type]}`}>
+        <div role="status" aria-live="polite" className={`${styles.feedback} ${styles[feedback.type]}`}>
           {feedback.type === "success" ? (
             <CheckCircle2 aria-hidden="true" />
           ) : feedback.type === "offline" ? (
@@ -351,8 +363,8 @@ export default function HazardForm() {
       )}
 
       <button type="submit" disabled={loading} className={styles.submit}>
-        <Send aria-hidden="true" />
-        Submit Report
+        <FileCheck2 aria-hidden="true" />
+        Review report
       </button>
 
       {showConfirmation && (
