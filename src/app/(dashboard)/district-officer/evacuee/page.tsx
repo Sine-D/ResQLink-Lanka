@@ -1,10 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MapPin, AlertTriangle, Save, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const MapSelector = dynamic(() => import("@/components/MapSelector"), { ssr: false });
+
+interface Shelter {
+  _id: string;
+  shelterId: string;
+  name: string;
+  location: string;
+  capacity: number;
+  occupancy: number;
+  status: string;
+}
 
 export default function EvacueePage() {
   const [formData, setFormData] = useState({
@@ -25,6 +35,23 @@ export default function EvacueePage() {
 
   const [householdMembers, setHouseholdMembers] = useState<{name: string, age: number | "", details: string}[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [evacuees, setEvacuees] = useState<any[]>([]);
+
+  const fetchEvacuees = async () => {
+    try {
+      const res = await fetch("/api/evacuees");
+      const data = await res.json();
+      if (res.ok) {
+        setEvacuees(data.evacuees || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch evacuees:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvacuees();
+  }, []);
 
   const handleHouseholdSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const size = parseInt(e.target.value) || 1;
@@ -109,6 +136,7 @@ export default function EvacueePage() {
           gpsStatus: "40.7128° N, 74.0060° W (Active)"
         });
         setHouseholdMembers([]);
+        fetchEvacuees();
       } else {
         const errorData = await res.json();
         alert(errorData.error || "Failed to register.");
@@ -315,54 +343,40 @@ export default function EvacueePage() {
             </div>
           </div>
 
-          {/* Recommended Shelter Options */}
+          {/* Registered Family List */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-x-auto">
             <div className="flex justify-between items-center mb-6 min-w-max gap-4">
-              <h2 className="text-lg font-bold text-white">Recommended Shelter Options</h2>
+              <h2 className="text-lg font-bold text-white">Registered Family List</h2>
               <div className="flex gap-2">
-                <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Near Me</button>
-                <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Medical Ready</button>
+                <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Recent</button>
+                <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Vulnerable</button>
               </div>
             </div>
 
             <table className="w-full text-sm text-left min-w-[600px]">
               <thead>
                 <tr className="text-xs text-slate-400 border-b border-slate-800">
-                  <th className="pb-3 font-semibold">Shelter Name</th>
-                  <th className="pb-3 font-semibold">Distance</th>
-                  <th className="pb-3 font-semibold">Capacity</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                  <th className="pb-3 font-semibold text-right">Action</th>
+                  <th className="pb-3 font-semibold">Case ID</th>
+                  <th className="pb-3 font-semibold">Head of Household</th>
+                  <th className="pb-3 font-semibold text-center">Size</th>
+                  <th className="pb-3 font-semibold">Vulnerability</th>
+                  <th className="pb-3 font-semibold">Origin</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
-                <tr className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-4 font-bold text-white">Grand Plaza Arena</td>
-                  <td className="py-4 text-slate-300">1.2 km</td>
-                  <td className="py-4 text-slate-300">88% (High)</td>
-                  <td className="py-4 font-bold text-orange-400">WARNING</td>
-                  <td className="py-4 text-right">
-                    <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-500 transition-colors">ALLOCATE</button>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-4 font-bold text-white">Riverside High Gym</td>
-                  <td className="py-4 text-slate-300">2.8 km</td>
-                  <td className="py-4 text-slate-300">62% (Stable)</td>
-                  <td className="py-4 font-bold text-emerald-400">STABLE</td>
-                  <td className="py-4 text-right">
-                    <button className="bg-slate-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-600 transition-colors">SELECT</button>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-4 font-bold text-white">St. Jude Community Center</td>
-                  <td className="py-4 text-slate-300">4.1 km</td>
-                  <td className="py-4 text-slate-300">94% (Full)</td>
-                  <td className="py-4 font-bold text-red-400">CRITICAL</td>
-                  <td className="py-4 text-right">
-                    <button className="bg-slate-800 text-slate-500 border border-slate-700 px-4 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed">FULL</button>
-                  </td>
-                </tr>
+                {evacuees.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-500">No registered families yet.</td>
+                  </tr>
+                ) : evacuees.map(evacuee => (
+                  <tr key={evacuee._id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="py-4 font-bold text-blue-400">{evacuee.caseId}</td>
+                    <td className="py-4 text-white font-bold">{evacuee.headOfHousehold} <span className="text-slate-400 font-normal text-xs">({evacuee.headOfHouseholdAge})</span></td>
+                    <td className="py-4 text-white text-center font-bold">{evacuee.householdSize}</td>
+                    <td className="py-4 text-slate-300">{evacuee.vulnerability || "-"}</td>
+                    <td className="py-4 text-slate-400 truncate max-w-[200px]" title={evacuee.originAddress}>{evacuee.originAddress}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
