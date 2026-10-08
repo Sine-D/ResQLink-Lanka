@@ -576,41 +576,56 @@ export default function ShelterPage() {
             </div>
           </div>
 
-          {/* Capacity Utilization Trends */}
+          {/* Shelter Capacity Status */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-white">Capacity Utilization Trends</h2>
-              <div className="flex items-center gap-4 text-xs font-semibold">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span className="text-slate-300">Current Occupancy</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-slate-700 rounded-full"></div>
-                  <span className="text-slate-500">Total Capacity</span>
-                </div>
-              </div>
+              <h2 className="text-lg font-bold text-white">Shelter Capacity Status</h2>
             </div>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorOccupancy" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="time" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }}
-                    itemStyle={{ color: '#3b82f6' }}
-                  />
-                  <Area type="monotone" dataKey="capacity" stroke="#334155" fill="none" strokeWidth={2} strokeDasharray="5 5" />
-                  <Area type="monotone" dataKey="occupancy" stroke="#3b82f6" fillOpacity={1} fill="url(#colorOccupancy)" strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+              {loading ? (
+                <div className="text-center text-slate-500 py-4">Loading data...</div>
+              ) : shelters.length === 0 ? (
+                <div className="text-center text-slate-500 py-4">No shelters registered.</div>
+              ) : shelters.map((shelter) => {
+                const occupancy = shelter.occupancy || 0;
+                const capacity = shelter.capacity || 1;
+                const percentage = Math.min(Math.round((occupancy / capacity) * 100), 100);
+                const spaceLeft = Math.max(capacity - occupancy, 0);
+                let barColor = "bg-emerald-500";
+                if (percentage >= 100) barColor = "bg-red-500";
+                else if (percentage >= 80) barColor = "bg-orange-500";
+                
+                return (
+                  <div key={shelter._id} className="bg-slate-950 p-4 rounded-xl border border-slate-800/50 hover:border-slate-700 transition-colors">
+                    <div className="flex justify-between items-end mb-3">
+                      <div>
+                        <h3 className="font-bold text-white flex items-center gap-2">
+                          {shelter.name}
+                          <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
+                            {shelter.shelterId}
+                          </span>
+                        </h3>
+                      </div>
+                      <div className="text-xs font-semibold text-right">
+                        {spaceLeft > 0 ? (
+                          <span className="text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-md border border-emerald-400/20">{spaceLeft} SPACES LEFT</span>
+                        ) : (
+                          <span className="text-red-500 bg-red-500/10 px-2 py-1 rounded-md border border-red-500/20">FULL</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="w-full bg-slate-800 rounded-full h-3 mb-2 overflow-hidden shadow-inner">
+                      <div className={`${barColor} h-3 rounded-full transition-all duration-1000 ease-out`} style={{ width: `${percentage}%` }}></div>
+                    </div>
+                    
+                    <div className="flex justify-between text-xs font-mono text-slate-400">
+                      <span>{occupancy} People Present</span>
+                      <span>{capacity} Total Capacity</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

@@ -71,10 +71,10 @@ export default function CommunicationsPage() {
         // Format SOS Feed
         const formattedSOS = (incidentsData.incidents || []).map((inc: any) => ({
           id: inc._id,
-          title: inc.type,
-          location: inc.location,
+          title: inc.title || "Unknown Incident",
+          location: inc.locationName || "Unknown Location",
           time: new Date(inc.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-          level: inc.severity || "HIGH"
+          level: (inc.severity || "HIGH").toUpperCase()
         }));
         setSosFeed(formattedSOS);
 
