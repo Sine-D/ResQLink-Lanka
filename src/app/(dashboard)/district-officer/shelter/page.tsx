@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, MapPin, Cloud, Bell, AlertTriangle, CheckCircle2, RotateCw, Plus, X } from "lucide-react";
+import { Search, MapPin, Cloud, Bell, AlertTriangle, CheckCircle2, RotateCw, Plus, X, Edit2, Trash2 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import dynamic from 'next/dynamic';
 
@@ -34,6 +34,7 @@ export default function ShelterPage() {
     contactPerson: '',
     facilities: ''
   });
+  const [editingShelterId, setEditingShelterId] = useState<string | null>(null);
 
   const fetchShelters = async () => {
     try {
@@ -53,10 +54,38 @@ export default function ShelterPage() {
     fetchShelters();
   }, []);
 
+  const handleEditClick = (shelter: any) => {
+    setEditingShelterId(shelter._id);
+    setNewShelter({
+      name: shelter.name,
+      capacity: shelter.capacity.toString(),
+      averageFamilySize: shelter.averageFamilySize?.toString() || '4',
+      contactPhone: shelter.contactPhone || '',
+      contactPerson: shelter.contactPerson || '',
+      facilities: shelter.facilities || ''
+    });
+    setSelectedLocation({
+      lat: shelter.coordinates?.lat || 0,
+      lng: shelter.coordinates?.lng || 0,
+      name: shelter.location
+    });
+    setShowAddModal(true);
+  };
+
+  const handleDeleteShelter = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this shelter?")) return;
+    try {
+      const res = await fetch(`/api/shelters/${id}`, { method: "DELETE" });
+      if (res.ok) fetchShelters();
+    } catch (error) {
+      console.error("Failed to delete shelter", error);
+    }
+  };
+
   const handleAddShelter = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload = {
+      const payload: any = {
         name: newShelter.name,
         location: selectedLocation ? selectedLocation.name : '',
         coordinates: {
@@ -65,20 +94,27 @@ export default function ShelterPage() {
         },
         capacity: parseInt(newShelter.capacity) || 0,
         averageFamilySize: parseInt(newShelter.averageFamilySize) || 4,
-        occupancy: 0,
         contactPhone: newShelter.contactPhone,
         contactPerson: newShelter.contactPerson,
         facilities: newShelter.facilities
       };
       
-      const res = await fetch("/api/shelters", {
-        method: "POST",
+      if (!editingShelterId) {
+        payload.occupancy = 0;
+      }
+      
+      const method = editingShelterId ? "PUT" : "POST";
+      const url = editingShelterId ? `/api/shelters/${editingShelterId}` : "/api/shelters";
+      
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       
       if (res.ok) {
         setShowAddModal(false);
+        setEditingShelterId(null);
         fetchShelters();
         setNewShelter({
           name: '', capacity: '', averageFamilySize: '4', contactPhone: '', contactPerson: '', facilities: ''
@@ -106,7 +142,7 @@ export default function ShelterPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
             <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-              <h3 className="text-xl font-bold text-white">Register New Shelter</h3>
+              <h3 className="text-xl font-bold text-white">{editingShelterId ? "Edit Shelter" : "Register New Shelter"}</h3>
               <button 
                 onClick={() => setShowAddModal(false)}
                 className="text-slate-400 hover:text-white transition-colors"
@@ -184,7 +220,7 @@ export default function ShelterPage() {
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors"
                 >
-                  Register Shelter
+                  {editingShelterId ? "Update Shelter" : "Register Shelter"}
                 </button>
               </div>
             </form>
@@ -269,7 +305,7 @@ export default function ShelterPage() {
                 <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
                   All Status
                 </button>
-                <button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
+                <button onClick={() => { setShowAddModal(true); setEditingShelterId(null); setNewShelter({name: '', capacity: '', averageFamilySize: '4', contactPhone: '', contactPerson: '', facilities: ''}); setSelectedLocation(null); }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
                   <Plus className="w-4 h-4" />
                   Add Shelter
                 </button>
@@ -280,13 +316,13 @@ export default function ShelterPage() {
               <table className="w-full text-sm text-left min-w-[700px]">
                 <thead>
                   <tr className="text-xs text-slate-400 border-b border-slate-800 uppercase">
-                    <th className="pb-3 font-semibold">Shelter ID / Name</th>
-                    <th className="pb-3 font-semibold">Location</th>
-                    <th className="pb-3 font-semibold">Distance</th>
-                    <th className="pb-3 font-semibold">Occupancy</th>
-                    <th className="pb-3 font-semibold">Capacity</th>
-                    <th className="pb-3 font-semibold">Status</th>
-                    <th className="pb-3 font-semibold text-right">Action</th>
+                    <th className="pb-3 px-4 font-semibold">Shelter ID / Name</th>
+                    <th className="pb-3 px-4 font-semibold">Location</th>
+                    <th className="pb-3 px-4 font-semibold">Distance</th>
+                    <th className="pb-3 px-4 font-semibold text-center">Occupancy</th>
+                    <th className="pb-3 px-4 font-semibold text-center">Capacity</th>
+                    <th className="pb-3 px-4 font-semibold">Status</th>
+                    <th className="pb-3 px-4 font-semibold text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
@@ -300,27 +336,43 @@ export default function ShelterPage() {
                     </tr>
                   ) : shelters.map((shelter) => (
                     <tr key={shelter._id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-4 font-bold text-white">{shelter.shelterId} - {shelter.name}</td>
-                      <td className="py-4 text-slate-400">{shelter.location}</td>
-                      <td className="py-4 text-slate-400">
+                      <td className="py-4 px-4 font-bold text-white">{shelter.shelterId} - {shelter.name}</td>
+                      <td className="py-4 px-4 text-slate-400">{shelter.location}</td>
+                      <td className="py-4 px-4 text-slate-400 whitespace-nowrap">
                         {/* Calculate distance or mock it for now since map logic varies */}
                         {(Math.random() * 5 + 0.5).toFixed(1)} km
                       </td>
-                      <td className="py-4 text-white">{shelter.occupancy}</td>
-                      <td className="py-4 text-white">{shelter.capacity}</td>
-                      <td className={`py-4 font-bold ${shelter.status === 'FULL' ? 'text-red-500' : shelter.status === 'NEAR CAPACITY' ? 'text-orange-400' : 'text-emerald-400'}`}>
+                      <td className="py-4 px-4 text-white text-center">{shelter.occupancy}</td>
+                      <td className="py-4 px-4 text-white text-center">{shelter.capacity}</td>
+                      <td className={`py-4 px-4 font-bold whitespace-nowrap ${shelter.status === 'FULL' ? 'text-red-500' : shelter.status === 'NEAR CAPACITY' ? 'text-orange-400' : 'text-emerald-400'}`}>
                         {shelter.status}
                       </td>
-                      <td className="py-4 text-right">
-                        <button 
-                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                            shelter.status === 'FULL' 
-                              ? 'bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed'
-                              : 'bg-slate-800 border border-slate-700 text-white hover:bg-slate-700'
-                          }`}
-                        >
-                          {shelter.status === 'FULL' ? 'Full' : 'Allocate'}
-                        </button>
+                      <td className="py-4 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => handleEditClick(shelter)}
+                            className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded transition-colors"
+                            title="Edit Shelter"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteShelter(shelter._id)}
+                            className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded transition-colors"
+                            title="Delete Shelter"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ml-2 ${
+                              shelter.status === 'FULL' 
+                                ? 'bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed'
+                                : 'bg-slate-800 border border-slate-700 text-white hover:bg-slate-700'
+                            }`}
+                          >
+                            {shelter.status === 'FULL' ? 'Full' : 'Allocate'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
