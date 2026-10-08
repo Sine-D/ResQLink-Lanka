@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, MapPin, Cloud, Bell, AlertTriangle, CheckCircle2, RotateCw, Plus, X } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import dynamic from 'next/dynamic';
@@ -23,10 +23,71 @@ export default function ShelterPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showMapSelector, setShowMapSelector] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, name: string} | null>(null);
+  
+  const [shelters, setShelters] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newShelter, setNewShelter] = useState({
+    name: '',
+    capacity: '',
+    averageFamilySize: '4',
+    contactPhone: '',
+    contactPerson: '',
+    facilities: ''
+  });
 
-  const handleAddShelter = (e: React.FormEvent) => {
+  const fetchShelters = async () => {
+    try {
+      const res = await fetch("/api/shelters");
+      const data = await res.json();
+      if (data.shelters) {
+        setShelters(data.shelters);
+      }
+    } catch (error) {
+      console.error("Failed to fetch shelters", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchShelters();
+  }, []);
+
+  const handleAddShelter = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowAddModal(false);
+    try {
+      const payload = {
+        name: newShelter.name,
+        location: selectedLocation ? selectedLocation.name : '',
+        coordinates: {
+          lat: selectedLocation ? selectedLocation.lat : 6.9271,
+          lng: selectedLocation ? selectedLocation.lng : 79.8612
+        },
+        capacity: parseInt(newShelter.capacity) || 0,
+        averageFamilySize: parseInt(newShelter.averageFamilySize) || 4,
+        occupancy: 0,
+        contactPhone: newShelter.contactPhone,
+        contactPerson: newShelter.contactPerson,
+        facilities: newShelter.facilities
+      };
+      
+      const res = await fetch("/api/shelters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        setShowAddModal(false);
+        fetchShelters();
+        setNewShelter({
+          name: '', capacity: '', averageFamilySize: '4', contactPhone: '', contactPerson: '', facilities: ''
+        });
+        setSelectedLocation(null);
+      }
+    } catch (error) {
+      console.error("Failed to save shelter", error);
+    }
   };
 
   return (
@@ -57,7 +118,7 @@ export default function ShelterPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1.5">Shelter Name</label>
-                  <input required type="text" placeholder="e.g. Royal College Main Hall" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  <input required type="text" value={newShelter.name} onChange={(e) => setNewShelter({...newShelter, name: e.target.value})} placeholder="e.g. Royal College Main Hall" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1.5">Location / Address</label>
@@ -89,20 +150,26 @@ export default function ShelterPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Max Capacity</label>
-                    <input required type="number" placeholder="e.g. 500" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                    <input required type="number" value={newShelter.capacity} onChange={(e) => setNewShelter({...newShelter, capacity: e.target.value})} placeholder="e.g. 500" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Avg Family Size</label>
+                    <input required type="number" min="1" value={newShelter.averageFamilySize} onChange={(e) => setNewShelter({...newShelter, averageFamilySize: e.target.value})} placeholder="e.g. 4" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contact Person Name</label>
+                    <input type="text" value={newShelter.contactPerson} onChange={(e) => setNewShelter({...newShelter, contactPerson: e.target.value})} placeholder="e.g. Mr. Silva" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contact Phone</label>
-                    <input type="text" placeholder="e.g. 0771234567" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                    <input type="text" value={newShelter.contactPhone} onChange={(e) => setNewShelter({...newShelter, contactPhone: e.target.value})} placeholder="e.g. 0771234567" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contact Person Name</label>
-                  <input type="text" placeholder="e.g. Mr. Silva" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
-                </div>
-                <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1.5">Available Facilities</label>
-                  <textarea placeholder="e.g. Water, Electricity, Separate Toilets" rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"></textarea>
+                  <textarea value={newShelter.facilities} onChange={(e) => setNewShelter({...newShelter, facilities: e.target.value})} placeholder="e.g. Water, Electricity, Separate Toilets" rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"></textarea>
                 </div>
               </div>
               <div className="pt-4 flex gap-3 justify-end border-t border-slate-800 mt-6">
@@ -223,58 +290,40 @@ export default function ShelterPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  <tr className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-white">SH-001 - Central High School</td>
-                    <td className="py-4 text-slate-400">Colombo 07</td>
-                    <td className="py-4 text-slate-400">0.8 km</td>
-                    <td className="py-4 text-white">185</td>
-                    <td className="py-4 text-white">200</td>
-                    <td className="py-4 font-bold text-orange-400">NEAR CAPACITY</td>
-                    <td className="py-4 text-right">
-                      <button className="bg-slate-800 border border-slate-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">
-                        Allocate
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-white opacity-50">SH-004 - St. Peters Community Hall</td>
-                    <td className="py-4 text-slate-400 opacity-50">Dehiwala</td>
-                    <td className="py-4 text-slate-400 opacity-50">2.3 km</td>
-                    <td className="py-4 text-white opacity-50">200</td>
-                    <td className="py-4 text-white opacity-50">200</td>
-                    <td className="py-4 font-bold text-red-500 opacity-50">FULL</td>
-                    <td className="py-4 text-right">
-                      <button className="bg-slate-900 border border-slate-800 text-slate-600 px-4 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed">
-                        Full
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-white">SH-009 - Buddhist Center</td>
-                    <td className="py-4 text-slate-400">Nugegoda</td>
-                    <td className="py-4 text-slate-400">3.1 km</td>
-                    <td className="py-4 text-white">42</td>
-                    <td className="py-4 text-white">150</td>
-                    <td className="py-4 font-bold text-emerald-400">AVAILABLE</td>
-                    <td className="py-4 text-right">
-                      <button className="bg-slate-800 border border-slate-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">
-                        Allocate
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-white">SH-012 - Municipal Stadium</td>
-                    <td className="py-4 text-slate-400">Colombo 03</td>
-                    <td className="py-4 text-slate-400">4.5 km</td>
-                    <td className="py-4 text-white">120</td>
-                    <td className="py-4 text-white">500</td>
-                    <td className="py-4 font-bold text-emerald-400">AVAILABLE</td>
-                    <td className="py-4 text-right">
-                      <button className="bg-slate-800 border border-slate-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">
-                        Allocate
-                      </button>
-                    </td>
-                  </tr>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500">Loading shelters...</td>
+                    </tr>
+                  ) : shelters.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500">No shelters found. Register a new one.</td>
+                    </tr>
+                  ) : shelters.map((shelter) => (
+                    <tr key={shelter._id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-4 font-bold text-white">{shelter.shelterId} - {shelter.name}</td>
+                      <td className="py-4 text-slate-400">{shelter.location}</td>
+                      <td className="py-4 text-slate-400">
+                        {/* Calculate distance or mock it for now since map logic varies */}
+                        {(Math.random() * 5 + 0.5).toFixed(1)} km
+                      </td>
+                      <td className="py-4 text-white">{shelter.occupancy}</td>
+                      <td className="py-4 text-white">{shelter.capacity}</td>
+                      <td className={`py-4 font-bold ${shelter.status === 'FULL' ? 'text-red-500' : shelter.status === 'NEAR CAPACITY' ? 'text-orange-400' : 'text-emerald-400'}`}>
+                        {shelter.status}
+                      </td>
+                      <td className="py-4 text-right">
+                        <button 
+                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                            shelter.status === 'FULL' 
+                              ? 'bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed'
+                              : 'bg-slate-800 border border-slate-700 text-white hover:bg-slate-700'
+                          }`}
+                        >
+                          {shelter.status === 'FULL' ? 'Full' : 'Allocate'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
