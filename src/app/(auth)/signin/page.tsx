@@ -92,11 +92,8 @@ export default function SignInPage() {
           </button>
         </form>
 
-        <div className="text-center pt-2 text-xs text-slate-400">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-red-400 font-bold hover:underline">
-            Register Account
-          </Link>
+        <div className="text-center pt-2 text-xs text-slate-500">
+          Authorized personnel access only &bull; Disaster Management Center
         </div>
       </div>
     </div>

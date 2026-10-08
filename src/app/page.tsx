@@ -21,7 +21,7 @@ export default function HomePage() {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative pt-24 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[620px] flex items-center justify-center">
+      <section className="relative -mt-16 pt-36 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[660px] flex items-center justify-center">
         {/* Background Image - clearly visible */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
