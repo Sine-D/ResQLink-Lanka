@@ -16,6 +16,12 @@ import {
   User,
   AlertTriangle,
   ClipboardClock,
+  LayoutDashboard,
+  TriangleAlert,
+  Shield,
+  MessageSquare,
+  Home,
+  UsersRound,
 } from "lucide-react";
 import HazardSyncManager from "@/components/hazard/HazardSyncManager";
 
@@ -174,20 +180,94 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* District Officer Menu Items */}
             {isDistrictOfficer && (
-              <Link
-                href="/district-officer/incidents"
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  pathname.startsWith("/district-officer")
-                    ? "bg-slate-800 text-white"
-                    : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-                }`}
-              >
-                <Truck className="w-4 h-4" />
-                <span>Rescue Dispatch</span>
-                <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
-                  STUB
-                </span>
-              </Link>
+              <>
+                <Link
+                  href="/district-officer"
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    pathname === "/district-officer"
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                  }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Link>
+
+                <Link
+                  href="/district-officer/incidents"
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    pathname.startsWith("/district-officer/incidents")
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                  }`}
+                >
+                  <TriangleAlert className="w-4 h-4" />
+                  <span>Incidents</span>
+                  <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                    FULL
+                  </span>
+                </Link>
+
+                <Link
+                  href="/district-officer/rescue-teams"
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    pathname.startsWith("/district-officer/rescue-teams")
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>Rescue Teams</span>
+                  <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                    STUB
+                  </span>
+                </Link>
+
+                <Link
+                  href="/district-officer/communications"
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    pathname.startsWith("/district-officer/communications")
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Communications</span>
+                  <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                    STUB
+                  </span>
+                </Link>
+
+                <Link
+                  href="/district-officer/shelter"
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    pathname.startsWith("/district-officer/shelter")
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                  }`}
+                >
+                  <Home className="w-4 h-4" />
+                  <span>Shelter</span>
+                  <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                    STUB
+                  </span>
+                </Link>
+
+                <Link
+                  href="/district-officer/evacuee"
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    pathname.startsWith("/district-officer/evacuee")
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                  }`}
+                >
+                  <UsersRound className="w-4 h-4" />
+                  <span>Evacuee</span>
+                  <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                    STUB
+                  </span>
+                </Link>
+              </>
             )}
           </div>
         </div>
