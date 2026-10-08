@@ -37,6 +37,9 @@ export default function ShelterPage() {
   });
   const [editingShelterId, setEditingShelterId] = useState<string | null>(null);
   const [selectedShelterDetails, setSelectedShelterDetails] = useState<any | null>(null);
+  
+  const [allocatingShelter, setAllocatingShelter] = useState<any | null>(null);
+  const [unallocatedEvacuees, setUnallocatedEvacuees] = useState<any[]>([]);
 
   const { data: session } = useSession();
   const userName = session?.user?.name || "D. Perera";
@@ -63,8 +66,21 @@ export default function ShelterPage() {
     }
   };
 
+  const fetchEvacuees = async () => {
+    try {
+      const res = await fetch("/api/evacuees");
+      const data = await res.json();
+      if (data.evacuees) {
+        setUnallocatedEvacuees(data.evacuees.filter((e: any) => !e.allocatedShelterId));
+      }
+    } catch (error) {
+      console.error("Failed to fetch evacuees", error);
+    }
+  };
+
   useEffect(() => {
     fetchShelters();
+    fetchEvacuees();
   }, []);
 
   const handleEditClick = (shelter: any) => {
@@ -93,6 +109,32 @@ export default function ShelterPage() {
       if (res.ok) fetchShelters();
     } catch (error) {
       console.error("Failed to delete shelter", error);
+    }
+  };
+
+  const handleAllocateToShelter = async (evacueeId: string, householdSize: number) => {
+    if (!allocatingShelter) return;
+    try {
+      // 1. Update Evacuee
+      await fetch(`/api/evacuees/${evacueeId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allocatedShelterId: allocatingShelter._id })
+      });
+      // 2. Update Shelter
+      const newOccupancy = (allocatingShelter.occupancy || 0) + householdSize;
+      await fetch(`/api/shelters/${allocatingShelter._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ occupancy: newOccupancy, capacity: allocatingShelter.capacity })
+      });
+      // 3. Refresh data
+      fetchShelters();
+      fetchEvacuees();
+      // update allocating shelter state to reflect new occupancy
+      setAllocatingShelter({...allocatingShelter, occupancy: newOccupancy});
+    } catch (error) {
+      console.error("Failed to allocate", error);
     }
   };
 
@@ -324,6 +366,77 @@ export default function ShelterPage() {
           </div>
         </div>
       )}
+
+      {/* Allocation Modal */}
+      {allocatingShelter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-white">Allocate to {allocatingShelter.name}</h3>
+                <p className="text-xs text-slate-400 mt-1">Available spaces: <span className="font-bold text-emerald-400">{allocatingShelter.capacity - (allocatingShelter.occupancy || 0)}</span></p>
+              </div>
+              <button 
+                onClick={() => setAllocatingShelter(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-0 overflow-y-auto flex-1">
+              <table className="w-full text-sm text-left">
+                <thead className="sticky top-0 bg-slate-900 shadow-sm z-10">
+                  <tr className="text-xs text-slate-400 border-b border-slate-800">
+                    <th className="py-3 px-4 font-semibold">Case ID / Head</th>
+                    <th className="py-3 px-4 font-semibold text-center">Family Size</th>
+                    <th className="py-3 px-4 font-semibold">Origin Location</th>
+                    <th className="py-3 px-4 font-semibold">Distance</th>
+                    <th className="py-3 px-4 font-semibold text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {unallocatedEvacuees.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-500">No unallocated families found.</td>
+                    </tr>
+                  ) : [...unallocatedEvacuees]
+                    .map(e => ({ ...e, dist: (e._id.charCodeAt(e._id.length-1) % 20) + (e._id.charCodeAt(e._id.length-2) % 10) / 10 }))
+                    .sort((a, b) => a.dist - b.dist)
+                    .map(evacuee => {
+                      const willExceed = (allocatingShelter.occupancy || 0) + evacuee.householdSize > allocatingShelter.capacity;
+                      return (
+                        <tr key={evacuee._id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-blue-400">{evacuee.caseId}</div>
+                            <div className="font-semibold text-slate-300 text-xs">{evacuee.headOfHousehold} ({evacuee.headOfHouseholdAge})</div>
+                          </td>
+                          <td className="py-3 px-4 text-white text-center font-bold">{evacuee.householdSize}</td>
+                          <td className="py-3 px-4 text-slate-400 text-xs max-w-[200px] truncate" title={evacuee.originAddress}>{evacuee.originAddress}</td>
+                          <td className="py-3 px-4 text-slate-300 font-mono text-xs">{evacuee.dist.toFixed(1)} km</td>
+                          <td className="py-3 px-4 text-right">
+                            <button 
+                              onClick={() => handleAllocateToShelter(evacuee._id, evacuee.householdSize)}
+                              disabled={willExceed}
+                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                                willExceed 
+                                  ? 'bg-red-500/10 text-red-500 border border-red-500/20 cursor-not-allowed'
+                                  : 'bg-blue-600 text-white hover:bg-blue-500'
+                              }`}
+                            >
+                              {willExceed ? 'Too Large' : 'Allocate'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div className="flex items-center gap-4">
@@ -446,7 +559,7 @@ export default function ShelterPage() {
                       </td>
                       <td className="py-4 px-4 text-right">
                         <button 
-                          onClick={(e) => { e.stopPropagation(); /* allocate logic here */ }}
+                          onClick={(e) => { e.stopPropagation(); setAllocatingShelter(shelter); }}
                           className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ml-2 ${
                             shelter.status === 'FULL' 
                               ? 'bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed'

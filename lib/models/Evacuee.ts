@@ -16,6 +16,7 @@ export interface IEvacuee extends Document {
   originAddress: string;
   gpsStatus: string;
   householdMembers: IHouseholdMember[];
+  allocatedShelterId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,11 +37,15 @@ const EvacueeSchema = new Schema<IEvacuee>(
     originAddress: { type: String, required: true },
     gpsStatus: { type: String, default: "" },
     householdMembers: { type: [HouseholdMemberSchema], default: [] },
+    allocatedShelterId: { type: String, default: null },
   },
   { timestamps: true }
 );
 
-const Evacuee: Model<IEvacuee> =
-  mongoose.models.Evacuee || mongoose.model<IEvacuee>("Evacuee", EvacueeSchema);
+if (mongoose.models.Evacuee) {
+  delete mongoose.models.Evacuee;
+}
+
+const Evacuee: Model<IEvacuee> = mongoose.model<IEvacuee>("Evacuee", EvacueeSchema);
 
 export default Evacuee;

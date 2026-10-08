@@ -358,7 +358,7 @@ export default function EvacueePage() {
                 <tr className="text-xs text-slate-400 border-b border-slate-800">
                   <th className="pb-3 font-semibold">Case ID</th>
                   <th className="pb-3 font-semibold">Head of Household</th>
-                  <th className="pb-3 font-semibold text-center">Size</th>
+                  <th className="pb-3 font-semibold text-center">Family Size</th>
                   <th className="pb-3 font-semibold">Vulnerability</th>
                   <th className="pb-3 font-semibold">Origin</th>
                 </tr>
