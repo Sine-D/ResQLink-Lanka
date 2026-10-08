@@ -2,7 +2,7 @@
  * @file warningSchema.ts
  * @description Zod Validation Schemas and TypeScript DTO types for UC1: Disaster Early-Warning.
  * Enforces strict input validation for disaster warning creation, GeoJSON Polygon closure,
- * chronological date boundaries, and domain enumerations.
+ * chronological date boundaries, optional source incident links, and domain enumerations.
  *
  * @architecture Clean Architecture / Interface Segregation Principle (ISP)
  * @solid
@@ -73,6 +73,7 @@ export const createWarningSchema = z
     instructions: z.string().min(10, "Instructions must be at least 10 characters long"),
     validFrom: z.coerce.date(),
     validUntil: z.coerce.date(),
+    sourceIncidentId: z.string().optional(), // Flow A1: link to verified report/incident
   })
   .refine((data) => data.validUntil > data.validFrom, {
     message: "Valid Until date must be strictly after Valid From date",

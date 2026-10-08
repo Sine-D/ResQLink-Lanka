@@ -13,6 +13,11 @@ import {
   InvalidTargetAreaError,
   WarningNotFoundError,
   InvalidWarningStateError,
+  TargetArea,
+  checkOverlappingActiveWarning,
+  cancelWarning,
+  getWarningDeliverySummary,
+  OverlappingWarningError,
 } from "../../lib/services/warningService";
 import * as notificationService from "../../lib/services/notificationService";
 import { createWarningSchema, geoJSONPolygonSchema } from "../../lib/validation/warningSchema";
@@ -79,9 +84,23 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
     });
 
     (Warning.findOne as jest.Mock).mockImplementation((query: any) => {
-      const found = mockWarningsStore.find(
-        (w) => w.warningId === query.warningId || w._id?.toString() === query._id?.toString()
-      );
+      const found = mockWarningsStore.find((w) => {
+        if (query.warningId && typeof query.warningId === "object" && query.warningId.$ne) {
+          if (w.warningId === query.warningId.$ne) return false;
+        } else if (query.warningId && typeof query.warningId === "string" && w.warningId !== query.warningId) {
+          return false;
+        }
+        if (query._id && w._id?.toString() !== query._id?.toString() && w._id !== query._id) {
+          return false;
+        }
+        if (query.status && w.status !== query.status) return false;
+        if (query.hazardType && w.hazardType !== query.hazardType) return false;
+        if (query["targetArea.districtName"]) {
+          const regex = query["targetArea.districtName"];
+          if (regex instanceof RegExp && !regex.test(w.targetArea.districtName)) return false;
+        }
+        return true;
+      });
       if (!found) {
         return {
           populate: jest.fn().mockResolvedValue(null),
@@ -615,6 +634,101 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
       const retried = await retryWarningDispatch(draft.warningId);
 
       expect(retried.dispatchStatus).toBe("SENT");
+    });
+  });
+
+  // =========================================================================
+  // 6. FORMAL USE-CASE FLOWS (A1, A5, Step 6, Step 7, Step 13, Overlap Check)
+  // =========================================================================
+  describe("6. Formal Use-Case Flows (A1, A5, Step 6, Step 7, Step 13)", () => {
+    test("6.1 Step 6: TargetArea.validateArea() provides direct alias for geospatial boundary validation", () => {
+      expect(TargetArea.validateArea("Colombo", validPolygon.coordinates)).toBe(true);
+      expect(() => TargetArea.validateArea("", validPolygon.coordinates)).toThrow(InvalidTargetAreaError);
+    });
+
+    test("6.2 Flow A1: createDraft() correctly links optional sourceIncidentId from verified reports", async () => {
+      const draft = await createDraft(
+        { ...sampleInput, sourceIncidentId: "INC-2026-FLOOD-001" },
+        dummyUserId
+      );
+
+      expect(draft.sourceIncidentId).toBe("INC-2026-FLOOD-001");
+    });
+
+    test("6.3 Step 7 & Flow E3: checkOverlappingActiveWarning() identifies conflicting active warnings", async () => {
+      // Initially, no overlapping active warning exists
+      const initialCheck = await checkOverlappingActiveWarning("Colombo", "Flood");
+      expect(initialCheck).toBeNull();
+
+      // Issue an active flood warning for Colombo
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
+
+      // Now overlapping check should find the active warning
+      const overlapFound = await checkOverlappingActiveWarning("Colombo", "Flood");
+      expect(overlapFound).not.toBeNull();
+      expect(overlapFound?.warningId).toBe(draft.warningId);
+
+      // Exclude check for self
+      const excludeSelf = await checkOverlappingActiveWarning("Colombo", "Flood", draft.warningId);
+      expect(excludeSelf).toBeNull();
+    });
+
+    test("6.4 Flow A5: cancelWarning() transitions ACTIVE -> CANCELLED and dispatches cancellation broadcast", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
+
+      const spyDispatch = jest.spyOn(notificationService, "dispatchNotification");
+
+      const cancelled = await cancelWarning(draft.warningId);
+
+      expect(cancelled.status).toBe("CANCELLED");
+      expect(spyDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({ warningId: draft.warningId, status: "CANCELLED" }),
+        "BOTH"
+      );
+      spyDispatch.mockRestore();
+    });
+
+    test("6.5 Flow A5 Error: cancelWarning() throws InvalidWarningStateError if warning is not ACTIVE", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      // draft status is DRAFT, not ACTIVE
+      await expect(cancelWarning(draft.warningId)).rejects.toThrow(InvalidWarningStateError);
+    });
+
+    test("6.6 Flow A5 Error: cancelWarning() throws WarningNotFoundError if warning does not exist", async () => {
+      await expect(cancelWarning("non-existent-uuid-cancel")).rejects.toThrow(WarningNotFoundError);
+    });
+
+    test("6.7 Step 13: getWarningDeliverySummary() returns delivery metrics breakdown for active/sent warning", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
+
+      const summary = await getWarningDeliverySummary(draft.warningId);
+
+      expect(summary).toBeDefined();
+      expect(summary.warningId).toBe(draft.warningId);
+      expect(summary.totalTargetReach).toBe(750000);
+      expect(summary.dispatchStatus).toBe("SENT");
+      expect(summary.sentCount).toBe(750000);
+      expect(summary.deliveredCount).toBeGreaterThan(0);
+      expect(summary.failedCount).toBe(0);
+      expect(summary.pendingCount).toBe(0);
+    });
+
+    test("6.8 Step 13 Error: getWarningDeliverySummary() throws WarningNotFoundError for invalid ID", async () => {
+      await expect(getWarningDeliverySummary("invalid-delivery-id")).rejects.toThrow(WarningNotFoundError);
+    });
+
+    test("6.9 OverlappingWarningError instantiates with correct name, code, and existingWarningId", () => {
+      const defaultErr = new OverlappingWarningError();
+      expect(defaultErr.name).toBe("OverlappingWarningError");
+      expect(defaultErr.code).toBe("OVERLAPPING_ACTIVE_WARNING");
+      expect(defaultErr.message).toBe("An overlapping active warning already exists for this area and hazard");
+
+      const customErr = new OverlappingWarningError("Overlap detected in Galle", "WARN-GALLE-001");
+      expect(customErr.existingWarningId).toBe("WARN-GALLE-001");
+      expect(customErr.message).toBe("Overlap detected in Galle");
     });
   });
 });

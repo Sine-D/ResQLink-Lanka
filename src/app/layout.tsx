@@ -6,7 +6,7 @@ import Providers from "@/components/Providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ResQLink Lanka | Disaster Early-Warning & Emergency Coordination",
+  title: "ResQLink Lanka",
   description:
     "National Smart Disaster Early-Warning & Emergency Coordination Platform for Sri Lanka",
 };
