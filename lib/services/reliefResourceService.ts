@@ -1,3 +1,15 @@
+/**
+ * @file reliefResourceService.ts
+ * @description Core Domain Service for Relief Resource Management, Multi-Agency Allocation,
+ * and Dispatch Order State Machine.
+ *
+ * Design Patterns & Principles Applied:
+ * - Single Responsibility Principle (SRP): Isolates relief business logic and inventory mutations.
+ * - Open/Closed Principle (OCP): Status machine transitions and custom errors are extensible.
+ * - Liskov Substitution Principle (LSP): Domain errors inherit from native Error with unique codes.
+ * - State Machine Pattern: Enforces valid dispatch life-cycle transitions (PENDING -> DELIVERED).
+ */
+
 import mongoose from "mongoose";
 import ReliefResource, { IReliefResource, AvailabilityStatus } from "../models/ReliefResource";
 import Distribution, { IDistribution } from "../models/Distribution";
@@ -35,6 +47,94 @@ export class ResourceNotFoundError extends Error {
   }
 }
 
+export class DispatchRejectedError extends Error {
+  public code = "DISPATCH_REJECTED";
+  constructor(message = "Dispatch order was rejected by agency coordinator") {
+    super(message);
+    this.name = "DispatchRejectedError";
+  }
+}
+
+export class TrackingUnavailableError extends Error {
+  public code = "TRACKING_UNAVAILABLE";
+  constructor(message = "Live tracking telemetry is currently unavailable") {
+    super(message);
+    this.name = "TrackingUnavailableError";
+  }
+}
+
+export class DispatchCreationError extends Error {
+  public code = "DISPATCH_CREATION_FAILED";
+  constructor(message = "Failed to create or persist dispatch order record") {
+    super(message);
+    this.name = "DispatchCreationError";
+  }
+}
+
+export class DuplicateDispatchError extends Error {
+  public code = "DUPLICATE_DISPATCH";
+  constructor(message = "A dispatch order with this ID or allocation already exists") {
+    super(message);
+    this.name = "DuplicateDispatchError";
+  }
+}
+
+export class InvalidQuantityError extends Error {
+  public code = "INVALID_QUANTITY";
+  constructor(message = "Quantity must be a positive number greater than 0") {
+    super(message);
+    this.name = "InvalidQuantityError";
+  }
+}
+
+export class IncidentNotFoundError extends Error {
+  public code = "INCIDENT_NOT_FOUND";
+  constructor(message = "Specified disaster incident record was not found") {
+    super(message);
+    this.name = "IncidentNotFoundError";
+  }
+}
+
+export class InvalidStatusTransitionError extends Error {
+  public code = "INVALID_STATUS_TRANSITION";
+  constructor(message = "Invalid dispatch status transition requested") {
+    super(message);
+    this.name = "InvalidStatusTransitionError";
+  }
+}
+
+export function validateStatusTransition(currentStatus: string, nextStatus: string): void {
+  if (currentStatus === nextStatus) {
+    throw new InvalidStatusTransitionError(
+      `Dispatch is already in state '${currentStatus}'. Cannot apply duplicate transition.`
+    );
+  }
+  if (currentStatus === "DELIVERED") {
+    throw new InvalidStatusTransitionError(
+      "Dispatch order is already DELIVERED. Cannot alter status of completed delivery."
+    );
+  }
+  if (currentStatus === "REJECTED") {
+    throw new InvalidStatusTransitionError(
+      "Dispatch order was REJECTED. Cannot transition a rejected order."
+    );
+  }
+
+  const allowedTransitions: Record<string, string[]> = {
+    PENDING: ["CONFIRMED", "REJECTED"],
+    CONFIRMED: ["DISPATCHED", "IN_TRANSIT", "REJECTED"],
+    DISPATCHED: ["IN_TRANSIT", "DELIVERED", "REJECTED"],
+    IN_TRANSIT: ["DELIVERED", "REJECTED"],
+  };
+
+  const allowed = allowedTransitions[currentStatus];
+  if (!allowed || !allowed.includes(nextStatus)) {
+    throw new InvalidStatusTransitionError(
+      `Invalid status transition from '${currentStatus}' to '${nextStatus}'.`
+    );
+  }
+}
+
 export async function listAvailableResources(
   rawFilters: ResourceFilterInput = {}
 ): Promise<IReliefResource[]> {
@@ -69,34 +169,8 @@ export async function checkResourceAvailability(
     resource = await ReliefResource.findById(resourceId);
   }
 
-  // Graceful fallback for multi-agency resource IDs in demo mode
   if (!resource) {
-    const categoryName = resourceId.includes("WATER")
-      ? "WATER"
-      : resourceId.includes("FOOD")
-      ? "FOOD"
-      : resourceId.includes("MED")
-      ? "MEDICAL"
-      : null;
-    if (categoryName) {
-      resource = await ReliefResource.findOne({ category: categoryName });
-    }
-  }
-
-  if (!resource) {
-    resource = await ReliefResource.findOne({});
-  }
-
-  if (!resource) {
-    resource = await ReliefResource.create({
-      resourceId: resourceId || "RES-WATER-01",
-      name: "Water",
-      category: "WATER",
-      district: "Colombo",
-      quantity: 5000,
-      unit: "units",
-      minimumThreshold: 500,
-    });
+    throw new ResourceNotFoundError(`Resource '${resourceId}' not found`);
   }
 
   if (
@@ -109,8 +183,9 @@ export async function checkResourceAvailability(
   }
 
   if (resource.quantity < requestedQuantity) {
-    resource.quantity = Math.max(resource.quantity, requestedQuantity + 3500);
-    await resource.save();
+    throw new InsufficientStockError(
+      `Requested quantity (${requestedQuantity}) exceeds available stock (${resource.quantity}) for '${resource.name}'`
+    );
   }
 
   return { resource, availableStock: resource.quantity };
