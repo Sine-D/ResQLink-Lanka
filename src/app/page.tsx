@@ -21,16 +21,19 @@ export default function HomePage() {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative pt-24 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Background Image */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105 transition-transform duration-1000"
-          style={{ backgroundImage: "url('/Hero.jpg')" }}
+      <section className="relative pt-24 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[620px] flex items-center justify-center">
+        {/* Background Image - clearly visible */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/Hero.jpg"
+          alt="Disaster Early Warning Background"
+          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
         />
-        {/* Dark Overlays for Text Readability & Cinematic Contrast */}
-        <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-[1px]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/60 to-slate-950" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.18),transparent_70%)] pointer-events-none" />
+
+        {/* Cinematic Overlays: maintains clear storm & city visibility while ensuring text readability */}
+        <div className="absolute inset-0 bg-slate-950/35 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/60 via-transparent to-slate-950 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.15),transparent_70%)] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto text-center space-y-8 relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold tracking-wide uppercase">

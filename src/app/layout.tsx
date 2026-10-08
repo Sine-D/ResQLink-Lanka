@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   title: "ResQLink Lanka",
   description:
     "National Smart Disaster Early-Warning & Emergency Coordination Platform for Sri Lanka",
+  icons: {
+    icon: "/logo.jpg",
+    shortcut: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
 };
 
 export default function RootLayout({

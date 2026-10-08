@@ -188,9 +188,9 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
     });
   });
 
-  // =========================================================================
-  // 1. POSITIVE / HAPPY PATH TEST CASES
-  // =========================================================================
+
+  // 1. POSITIVE TEST CASES
+
   describe("1. Positive (Happy Path) Test Cases", () => {
     test("1.1 createDraft() successfully creates a warning draft with DRAFT and NOT_SENT status", async () => {
       const draft = await createDraft(sampleInput, dummyUserId);
@@ -312,9 +312,9 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
     });
   });
 
-  // =========================================================================
-  // 2. NEGATIVE & SCHEMA VALIDATION TEST CASES
-  // =========================================================================
+
+  // 2. NEGATIVE TEST CASES
+
   describe("2. Negative & Validation Test Cases", () => {
     test("2.1 Zod schema strictly rejects inverted dates (validUntil <= validFrom)", () => {
       const invalidDateInput = {
@@ -419,9 +419,9 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
     });
   });
 
-  // =========================================================================
+
   // 3. EDGE & BOUNDARY TEST CASES
-  // =========================================================================
+
   describe("3. Edge & Boundary Test Cases", () => {
     test("3.1 Minimal closed polygon with exactly 4 coordinate vertices passes validation", () => {
       const minimalTriangleClosed = {
@@ -491,9 +491,9 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
     });
   });
 
-  // =========================================================================
-  // 4. ERROR & EXCEPTION HANDLING TEST CASES
-  // =========================================================================
+
+  // 4. ERROR & EXCEPTION TEST CASES
+
   describe("4. Error & Exception Handling Test Cases", () => {
     test("4.1 issueWarning() throws WarningNotFoundError for non-existent UUID", async () => {
       await expect(issueWarning("invalid-uuid-9999")).rejects.toThrow(WarningNotFoundError);
@@ -559,9 +559,9 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
     });
   });
 
-  // =========================================================================
+
   // 5. IDEMPOTENCY & FAULT TOLERANCE TEST CASES
-  // =========================================================================
+
   describe("5. Idempotency & Fault Tolerance Test Cases", () => {
     test("5.1 issueWarning() on an already-ACTIVE warning is idempotent and avoids redundant re-dispatch", async () => {
       const draft = await createDraft(sampleInput, dummyUserId);
@@ -637,9 +637,9 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
     });
   });
 
-  // =========================================================================
-  // 6. FORMAL USE-CASE FLOWS (A1, A5, Step 6, Step 7, Step 13, Overlap Check)
-  // =========================================================================
+
+  // 6. FORMAL USE-CASE FLOWS 
+
   describe("6. Formal Use-Case Flows (A1, A5, Step 6, Step 7, Step 13)", () => {
     test("6.1 Step 6: TargetArea.validateArea() provides direct alias for geospatial boundary validation", () => {
       expect(TargetArea.validateArea("Colombo", validPolygon.coordinates)).toBe(true);

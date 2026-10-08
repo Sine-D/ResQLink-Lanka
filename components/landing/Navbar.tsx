@@ -2,7 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { ShieldAlert, ArrowRight, UserCheck } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, UserCheck } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 
 export const Navbar: React.FC = () => {
@@ -12,8 +13,13 @@ export const Navbar: React.FC = () => {
     <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-red-600/20 group-hover:scale-105 transition-transform">
-            <ShieldAlert className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 flex items-center justify-center shadow-lg shadow-red-600/20 group-hover:scale-105 transition-transform">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.jpg"
+              alt="ResQLink Lanka Logo"
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
             <span className="text-lg font-black tracking-tight text-white">ResQLink</span>

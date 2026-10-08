@@ -98,9 +98,9 @@ describe("UC1: Notification Service & Gateway Dispatch Unit Tests", () => {
     });
   });
 
-  // =========================================================================
-  // 1. POSITIVE / HAPPY PATH TEST CASES
-  // =========================================================================
+
+  // 1. POSITIVE TEST CASES
+
   describe("1. Positive (Happy Path) Test Cases", () => {
     test("1.1 dispatchNotification() success path creates SENT notification and updates warning to SENT", async () => {
       const mockGateway = new MockEmergencyGatewayClient();
@@ -157,9 +157,9 @@ describe("UC1: Notification Service & Gateway Dispatch Unit Tests", () => {
     });
   });
 
-  // =========================================================================
+
   // 2. NEGATIVE & ERROR HANDLING TEST CASES
-  // =========================================================================
+
   describe("2. Negative & Error Handling Test Cases", () => {
     test("2.1 dispatchNotification() when gateway throws GatewayUnavailableError -> sets PENDING_DISPATCH", async () => {
       const mockGateway = new MockEmergencyGatewayClient();
@@ -221,9 +221,9 @@ describe("UC1: Notification Service & Gateway Dispatch Unit Tests", () => {
     });
   });
 
-  // =========================================================================
+
   // 3. RETRY & IDEMPOTENCY TEST CASES
-  // =========================================================================
+
   describe("3. Retry & Idempotency Test Cases", () => {
     test("3.1 retryNotificationDispatch() re-attempts pending/failed dispatch and succeeds once gateway recovers", async () => {
       const mockGateway = new MockEmergencyGatewayClient();
