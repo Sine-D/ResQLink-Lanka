@@ -1,14 +1,35 @@
+/**
+ * @file Warning.ts
+ * @description Mongoose Data Model and Schema definition for UC1: Disaster Warnings.
+ * Stores core early-warning entities, GeoJSON polygon boundaries, demographic reach,
+ * author references, and multi-channel dispatch delivery statuses.
+ *
+ * @architecture Clean Architecture / Entity Layer
+ * @solid
+ * - Single Responsibility Principle (SRP): Defines the persistence schema and database contract for Warnings.
+ */
+
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { ITargetArea } from "./TargetArea";
 
-export type HazardType = "Flood" | "Landslide" | "Cyclone" | "Tsunami" | "Drought" | "FlashFlood";
+export type HazardType =
+  | "Flood"
+  | "Landslide"
+  | "Cyclone"
+  | "Tsunami"
+  | "Drought"
+  | "FlashFlood";
+
 export type SeverityLevel = "Low" | "Medium" | "High" | "Critical";
 export type WarningStatus = "DRAFT" | "ACTIVE" | "EXPIRED";
 export type DispatchStatus = "NOT_SENT" | "SENT" | "PENDING_DISPATCH" | "FAILED";
 
+/**
+ * TypeScript interface representing a Warning document stored in MongoDB.
+ */
 export interface IWarning extends Document {
   _id: mongoose.Types.ObjectId;
-  warningId: string; // UUID v4
+  warningId: string; // Business UUID v4
   hazardType: HazardType;
   severity: SeverityLevel;
   status: WarningStatus;
@@ -60,6 +81,7 @@ const WarningSchema = new Schema<IWarning>(
       enum: ["DRAFT", "ACTIVE", "EXPIRED"],
       default: "DRAFT",
       required: true,
+      index: true,
     },
     targetArea: { type: TargetAreaSchema, required: true },
     instructions: { type: String, required: true, minlength: 10 },

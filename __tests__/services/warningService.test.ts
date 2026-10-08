@@ -12,20 +12,22 @@ import {
   estimateDistrictReach,
   InvalidTargetAreaError,
   WarningNotFoundError,
+  InvalidWarningStateError,
 } from "../../lib/services/warningService";
 import * as notificationService from "../../lib/services/notificationService";
-import { createWarningSchema } from "../../lib/validation/warningSchema";
+import { createWarningSchema, geoJSONPolygonSchema } from "../../lib/validation/warningSchema";
 import { ZodError } from "zod";
 
 jest.mock("../../lib/models/Warning");
 jest.mock("../../lib/models/User");
 jest.mock("../../lib/models/Notification");
 
-describe("Warning Service & Logic Unit Tests (Member 1)", () => {
+describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
   let mockWarningsStore: any[] = [];
   let mockNotificationsStore: any[] = [];
   const dummyUserId = "507f1f77bcf86cd799439011";
 
+  // Standard valid GeoJSON Polygon for testing
   const validPolygon = {
     type: "Polygon" as const,
     coordinates: [
@@ -97,19 +99,28 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
         }),
         populate: jest.fn().mockResolvedValue({
           ...found,
-          issuedBy: { _id: dummyUserId, name: "Officer Perera", email: "perera@dmc.gov.lk", role: "DMC_OFFICER" },
+          issuedBy: {
+            _id: dummyUserId,
+            name: "Officer Perera",
+            email: "perera@dmc.gov.lk",
+            role: "DMC_OFFICER",
+          },
         }),
       };
       return instance;
     });
 
     (Warning.findById as jest.Mock).mockImplementation((id: any) => {
-      const found = mockWarningsStore.find((w) => w._id?.toString() === id?.toString() || w._id === id);
+      const found = mockWarningsStore.find(
+        (w) => w._id?.toString() === id?.toString() || w._id === id
+      );
       return Promise.resolve(found || null);
     });
 
     (Warning.findByIdAndUpdate as jest.Mock).mockImplementation((id: any, update: any) => {
-      const target = mockWarningsStore.find((w) => w._id?.toString() === id?.toString() || w._id === id);
+      const target = mockWarningsStore.find(
+        (w) => w._id?.toString() === id?.toString() || w._id === id
+      );
       if (target) {
         Object.assign(target, update);
       }
@@ -136,7 +147,9 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
       const instance = {
         ...data,
         save: jest.fn().mockImplementation(function (this: any) {
-          const idx = mockNotificationsStore.findIndex((n) => n.notificationId === this.notificationId);
+          const idx = mockNotificationsStore.findIndex(
+            (n) => n.notificationId === this.notificationId
+          );
           if (idx >= 0) {
             mockNotificationsStore[idx] = { ...this };
           } else {
@@ -156,190 +169,452 @@ describe("Warning Service & Logic Unit Tests (Member 1)", () => {
     });
   });
 
-  test("creates a draft with correct default status (DRAFT and NOT_SENT)", async () => {
-    const draft = await createDraft(sampleInput, dummyUserId);
+  // =========================================================================
+  // 1. POSITIVE / HAPPY PATH TEST CASES
+  // =========================================================================
+  describe("1. Positive (Happy Path) Test Cases", () => {
+    test("1.1 createDraft() successfully creates a warning draft with DRAFT and NOT_SENT status", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
 
-    expect(draft).toBeDefined();
-    expect(draft.warningId).toBeDefined();
-    expect(draft.status).toBe("DRAFT");
-    expect(draft.dispatchStatus).toBe("NOT_SENT");
-    expect(draft.targetArea.estimatedReach).toBe(750000); // Colombo population lookup
-  });
-
-  test("createDraft() NEVER calls notificationService (spy assertion)", async () => {
-    const spyDispatch = jest.spyOn(notificationService, "dispatchNotification");
-
-    await createDraft(sampleInput, dummyUserId);
-
-    expect(spyDispatch).not.toHaveBeenCalled();
-    spyDispatch.mockRestore();
-  });
-
-  test("issue() transitions DRAFT -> ACTIVE and persists before dispatch (assert call order)", async () => {
-    const draft = await createDraft(sampleInput, dummyUserId);
-
-    let persistedStatusBeforeDispatch = "";
-    const originalDispatch = notificationService.dispatchNotification;
-    const spyDispatch = jest
-      .spyOn(notificationService, "dispatchNotification")
-      .mockImplementation(async (warningDoc) => {
-        const stored = mockWarningsStore.find((w) => w.warningId === warningDoc.warningId);
-        persistedStatusBeforeDispatch = stored?.status || "";
-        return originalDispatch(warningDoc);
-      });
-
-    const issued = await issueWarning(draft.warningId);
-
-    expect(spyDispatch).toHaveBeenCalledTimes(1);
-    expect(persistedStatusBeforeDispatch).toBe("ACTIVE");
-    expect(issued.status).toBe("ACTIVE");
-    expect(issued.dispatchStatus).toBe("SENT");
-
-    spyDispatch.mockRestore();
-  });
-
-  test("issue() throws InvalidTargetAreaError for an unsupported/invalid district and does NOT update record beyond DRAFT", async () => {
-    // Manually push a draft with invalid target district into store bypassing initial create draft check
-    const draftId = "unsupported-draft-uuid";
-    mockWarningsStore.push({
-      _id: "obj_unsupported_1",
-      warningId: draftId,
-      hazardType: "Flood",
-      severity: "High",
-      status: "DRAFT",
-      targetArea: {
-        districtName: "Unsupported_District",
-        coordinates: validPolygon,
-        estimatedReach: 0,
-      },
-      instructions: "Testing unsupported district error exception flow",
-      validFrom: new Date(),
-      validUntil: new Date(Date.now() + 86400000),
-      issuedBy: dummyUserId,
-      dispatchStatus: "NOT_SENT",
+      expect(draft).toBeDefined();
+      expect(draft.warningId).toBeDefined();
+      expect(typeof draft.warningId).toBe("string");
+      expect(draft.hazardType).toBe("Flood");
+      expect(draft.severity).toBe("High");
+      expect(draft.status).toBe("DRAFT");
+      expect(draft.dispatchStatus).toBe("NOT_SENT");
+      expect(draft.targetArea.districtName).toBe("Colombo");
+      expect(draft.targetArea.estimatedReach).toBe(750000); // Colombo population lookup
     });
 
-    await expect(issueWarning(draftId)).rejects.toThrow(InvalidTargetAreaError);
+    test("1.2 createDraft() decouples draft creation from broadcast: notificationService is NEVER called", async () => {
+      const spyDispatch = jest.spyOn(notificationService, "dispatchNotification");
 
-    const stored = mockWarningsStore.find((w) => w.warningId === draftId);
-    expect(stored?.status).toBe("DRAFT");
-    expect(stored?.dispatchStatus).toBe("NOT_SENT");
+      await createDraft(sampleInput, dummyUserId);
+
+      expect(spyDispatch).not.toHaveBeenCalled();
+      spyDispatch.mockRestore();
+    });
+
+    test("1.3 issueWarning() transitions state DRAFT -> ACTIVE and persists before triggering dispatch", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+
+      let persistedStatusBeforeDispatch = "";
+      const originalDispatch = notificationService.dispatchNotification;
+      const spyDispatch = jest
+        .spyOn(notificationService, "dispatchNotification")
+        .mockImplementation(async (warningDoc) => {
+          const stored = mockWarningsStore.find((w) => w.warningId === warningDoc.warningId);
+          persistedStatusBeforeDispatch = stored?.status || "";
+          return originalDispatch(warningDoc);
+        });
+
+      const issued = await issueWarning(draft.warningId);
+
+      expect(spyDispatch).toHaveBeenCalledTimes(1);
+      expect(persistedStatusBeforeDispatch).toBe("ACTIVE");
+      expect(issued.status).toBe("ACTIVE");
+      expect(issued.dispatchStatus).toBe("SENT");
+
+      spyDispatch.mockRestore();
+    });
+
+    test("1.4 Query helpers: getWarningById(), listActiveWarnings(), and listAllWarnings() return populated models", async () => {
+      const draft1 = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft1.warningId);
+
+      const draft2 = await createDraft(
+        { ...sampleInput, districtName: "Galle" },
+        dummyUserId
+      );
+
+      // getWarningById
+      const fetched = await getWarningById(draft1.warningId);
+      expect(fetched).not.toBeNull();
+      expect(fetched?.warningId).toBe(draft1.warningId);
+
+      // listActiveWarnings without filters
+      const activeWarnings = await listActiveWarnings();
+      expect(activeWarnings.length).toBe(1);
+      expect(activeWarnings[0].warningId).toBe(draft1.warningId);
+
+      // listActiveWarnings with matching district
+      const colomboActive = await listActiveWarnings("Colombo");
+      expect(colomboActive.length).toBe(1);
+      expect(colomboActive[0].targetArea.districtName).toBe("Colombo");
+
+      // listActiveWarnings with non-matching district
+      const galleActive = await listActiveWarnings("Galle");
+      expect(galleActive.length).toBe(0);
+
+      // listAllWarnings
+      const allWarnings = await listAllWarnings();
+      expect(allWarnings.length).toBe(2);
+    });
+
+    test("1.5 estimateDistrictReach() calculates correct demographic reach for major Sri Lankan districts", () => {
+      expect(estimateDistrictReach("Colombo")).toBe(750000);
+      expect(estimateDistrictReach("Gampaha")).toBe(600000);
+      expect(estimateDistrictReach("Kandy")).toBe(400000);
+      expect(estimateDistrictReach("Galle")).toBe(300000);
+      expect(estimateDistrictReach("Kalutara")).toBe(350000);
+      expect(estimateDistrictReach("Jaffna")).toBe(200000);
+      expect(estimateDistrictReach("Badulla")).toBe(190000);
+    });
+
+    test("1.6 Supports all domain hazard types and severity levels correctly", async () => {
+      const hazardTypes = [
+        "Landslide",
+        "Cyclone",
+        "Tsunami",
+        "Drought",
+        "FlashFlood",
+      ] as const;
+      const severityLevels = ["Low", "Medium", "High", "Critical"] as const;
+
+      for (let i = 0; i < hazardTypes.length; i++) {
+        const hazard = hazardTypes[i];
+        const severity = severityLevels[i % severityLevels.length];
+
+        const draft = await createDraft(
+          {
+            ...sampleInput,
+            hazardType: hazard,
+            severity: severity,
+            districtName: "Kandy",
+          },
+          dummyUserId
+        );
+
+        expect(draft.hazardType).toBe(hazard);
+        expect(draft.severity).toBe(severity);
+        expect(draft.targetArea.estimatedReach).toBe(400000);
+      }
+    });
   });
 
-  test("dispatch() when gateway throws 'unavailable' sets PENDING_DISPATCH and warning stays ACTIVE", async () => {
-    const mockGateway = new notificationService.MockEmergencyGatewayClient();
-    mockGateway.setMode("UNAVAILABLE");
-    notificationService.setGatewayClient(mockGateway);
+  // =========================================================================
+  // 2. NEGATIVE & SCHEMA VALIDATION TEST CASES
+  // =========================================================================
+  describe("2. Negative & Validation Test Cases", () => {
+    test("2.1 Zod schema strictly rejects inverted dates (validUntil <= validFrom)", () => {
+      const invalidDateInput = {
+        ...sampleInput,
+        validFrom: new Date(2026, 5, 10, 12, 0, 0),
+        validUntil: new Date(2026, 5, 10, 11, 0, 0),
+      };
 
-    const draft = await createDraft(sampleInput, dummyUserId);
-    const issued = await issueWarning(draft.warningId);
+      expect(() => createWarningSchema.parse(invalidDateInput)).toThrow(ZodError);
+      try {
+        createWarningSchema.parse(invalidDateInput);
+      } catch (err: any) {
+        expect(err.issues[0].message).toContain("Valid Until date must be strictly after Valid From date");
+      }
+    });
 
-    expect(issued.status).toBe("ACTIVE");
-    expect(issued.dispatchStatus).toBe("PENDING_DISPATCH");
+    test("2.2 Zod schema rejects empty instructions or instructions with less than 10 characters", () => {
+      const shortInstructionsInput = {
+        ...sampleInput,
+        instructions: "Evacuate", // 8 chars (< 10)
+      };
+      expect(() => createWarningSchema.parse(shortInstructionsInput)).toThrow(ZodError);
+
+      const emptyInstructionsInput = {
+        ...sampleInput,
+        instructions: "",
+      };
+      expect(() => createWarningSchema.parse(emptyInstructionsInput)).toThrow(ZodError);
+    });
+
+    test("2.3 Zod schema rejects missing hazardType or unsupported hazard categories", () => {
+      const missingHazardInput = {
+        ...sampleInput,
+        hazardType: undefined,
+      };
+      expect(() => createWarningSchema.parse(missingHazardInput)).toThrow(ZodError);
+
+      const invalidHazardInput = {
+        ...sampleInput,
+        hazardType: "VolcanoEruption", // Not in enum
+      };
+      expect(() => createWarningSchema.parse(invalidHazardInput)).toThrow(ZodError);
+    });
+
+    test("2.4 Zod schema rejects missing or empty districtName", () => {
+      const emptyDistrictInput = {
+        ...sampleInput,
+        districtName: "",
+      };
+      expect(() => createWarningSchema.parse(emptyDistrictInput)).toThrow(ZodError);
+    });
+
+    test("2.5 geoJSONPolygonSchema rejects polygons with unclosed coordinates or fewer than 4 points", () => {
+      // Unclosed polygon (first point != last point)
+      const unclosedPolygon = {
+        type: "Polygon" as const,
+        coordinates: [
+          [
+            [79.86, 6.92] as [number, number],
+            [79.88, 6.92] as [number, number],
+            [79.88, 6.94] as [number, number],
+            [79.86, 6.94] as [number, number], // Doesn't close back to [79.86, 6.92]
+          ],
+        ],
+      };
+      expect(() => geoJSONPolygonSchema.parse(unclosedPolygon)).toThrow(ZodError);
+
+      // Fewer than 4 points
+      const tooFewPointsPolygon = {
+        type: "Polygon" as const,
+        coordinates: [
+          [
+            [79.86, 6.92] as [number, number],
+            [79.88, 6.92] as [number, number],
+            [79.86, 6.92] as [number, number],
+          ],
+        ],
+      };
+      expect(() => geoJSONPolygonSchema.parse(tooFewPointsPolygon)).toThrow(ZodError);
+
+      // Empty outer ring (covers outerRing.length < 4 boundary)
+      const emptyRingPolygon = {
+        type: "Polygon" as const,
+        coordinates: [[]],
+      };
+      expect(() => geoJSONPolygonSchema.parse(emptyRingPolygon)).toThrow(ZodError);
+    });
+
+    test("2.6 validateTargetArea() throws InvalidTargetAreaError for empty string or null coordinates", () => {
+      expect(() => validateTargetArea("", validPolygon.coordinates)).toThrow(
+        InvalidTargetAreaError
+      );
+      expect(() => validateTargetArea("   ", validPolygon.coordinates)).toThrow(
+        InvalidTargetAreaError
+      );
+      expect(() => validateTargetArea("Colombo", [])).toThrow(
+        InvalidTargetAreaError
+      );
+      expect(() => validateTargetArea("Colombo", [[]])).toThrow(
+        InvalidTargetAreaError
+      );
+    });
   });
 
-  test("dispatch() when gateway throws critical error sets FAILED, errorLog populated, warning stays ACTIVE", async () => {
-    const mockGateway = new notificationService.MockEmergencyGatewayClient();
-    mockGateway.setMode("CRITICAL_ERROR");
-    notificationService.setGatewayClient(mockGateway);
+  // =========================================================================
+  // 3. EDGE & BOUNDARY TEST CASES
+  // =========================================================================
+  describe("3. Edge & Boundary Test Cases", () => {
+    test("3.1 Minimal closed polygon with exactly 4 coordinate vertices passes validation", () => {
+      const minimalTriangleClosed = {
+        type: "Polygon" as const,
+        coordinates: [
+          [
+            [79.86, 6.92] as [number, number],
+            [79.88, 6.92] as [number, number],
+            [79.87, 6.95] as [number, number],
+            [79.86, 6.92] as [number, number], // 4 vertices, closed
+          ],
+        ],
+      };
 
-    const draft = await createDraft(sampleInput, dummyUserId);
-    const issued = await issueWarning(draft.warningId);
+      expect(() => geoJSONPolygonSchema.parse(minimalTriangleClosed)).not.toThrow();
+      expect(validateTargetArea("Colombo", minimalTriangleClosed.coordinates)).toBe(true);
+    });
 
-    expect(issued.status).toBe("ACTIVE");
-    expect(issued.dispatchStatus).toBe("FAILED");
+    test("3.2 Instructions field boundary: exactly 10 characters passes, 9 characters fails", () => {
+      const exactly10Input = {
+        ...sampleInput,
+        instructions: "1234567890", // Exactly 10 chars
+      };
+      expect(() => createWarningSchema.parse(exactly10Input)).not.toThrow();
 
-    const notificationRecord = mockNotificationsStore.find((n) => n.warningId?.toString() === draft._id?.toString());
-    expect(notificationRecord?.status).toBe("FAILED");
-    expect(notificationRecord?.errorLog).toBeDefined();
+      const exactly9Input = {
+        ...sampleInput,
+        instructions: "123456789", // 9 chars
+      };
+      expect(() => createWarningSchema.parse(exactly9Input)).toThrow(ZodError);
+    });
+
+    test("3.3 Date boundary: validUntil exactly equal to validFrom fails strict inequality check", () => {
+      const exactSameDate = new Date(2026, 6, 15, 10, 0, 0);
+      const equalDatesInput = {
+        ...sampleInput,
+        validFrom: exactSameDate,
+        validUntil: exactSameDate,
+      };
+
+      expect(() => createWarningSchema.parse(equalDatesInput)).toThrow(ZodError);
+    });
+
+    test("3.4 estimateDistrictReach() is resilient to irregular casing and whitespace padding", () => {
+      expect(estimateDistrictReach("   colombo   ")).toBe(750000);
+      expect(estimateDistrictReach("kAnDy")).toBe(400000);
+      expect(estimateDistrictReach("NuWaRaElIyA")).toBe(210000);
+      expect(estimateDistrictReach("  Galle ")).toBe(300000);
+    });
+
+    test("3.5 estimateDistrictReach() returns default fallback (150,000) for unmapped/custom districts", () => {
+      expect(estimateDistrictReach("UnknownOceanicRegion")).toBe(150000);
+      expect(estimateDistrictReach("InternationalWaters")).toBe(150000);
+    });
+
+    test("3.6 listActiveWarnings('ALL') returns all active warnings without applying district regex", async () => {
+      const draft1 = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft1.warningId);
+
+      const allActive = await listActiveWarnings("ALL");
+      expect(allActive.length).toBe(1);
+    });
+
+    test("3.7 getWarningById() returns null when query finds no matching warning record", async () => {
+      const result = await getWarningById("non-existent-uuid-12345");
+      expect(result).toBeNull();
+    });
   });
 
-  test("retryWarningDispatch() only re-attempts notifications PENDING_DISPATCH or FAILED, updating status to SENT", async () => {
-    const mockGateway = new notificationService.MockEmergencyGatewayClient();
-    mockGateway.setMode("UNAVAILABLE");
-    notificationService.setGatewayClient(mockGateway);
+  // =========================================================================
+  // 4. ERROR & EXCEPTION HANDLING TEST CASES
+  // =========================================================================
+  describe("4. Error & Exception Handling Test Cases", () => {
+    test("4.1 issueWarning() throws WarningNotFoundError for non-existent UUID", async () => {
+      await expect(issueWarning("invalid-uuid-9999")).rejects.toThrow(WarningNotFoundError);
+    });
 
-    const draft = await createDraft(sampleInput, dummyUserId);
-    await issueWarning(draft.warningId);
+    test("4.2 retryWarningDispatch() throws WarningNotFoundError for non-existent UUID", async () => {
+      await expect(retryWarningDispatch("missing-uuid-8888")).rejects.toThrow(WarningNotFoundError);
+    });
 
-    // Switch gateway back to SUCCESS
-    mockGateway.setMode("SUCCESS");
-    const retried = await retryWarningDispatch(draft.warningId);
+    test("4.3 issueWarning() throws InvalidTargetAreaError for unsupported/invalid district name and stays in DRAFT", async () => {
+      const draftId = "unsupported-draft-uuid";
+      mockWarningsStore.push({
+        _id: "obj_unsupported_1",
+        warningId: draftId,
+        hazardType: "Flood",
+        severity: "High",
+        status: "DRAFT",
+        targetArea: {
+          districtName: "Unsupported_District",
+          coordinates: validPolygon,
+          estimatedReach: 0,
+        },
+        instructions: "Testing unsupported district error exception flow",
+        validFrom: new Date(),
+        validUntil: new Date(Date.now() + 86400000),
+        issuedBy: dummyUserId,
+        dispatchStatus: "NOT_SENT",
+      });
 
-    expect(retried.dispatchStatus).toBe("SENT");
+      await expect(issueWarning(draftId)).rejects.toThrow(InvalidTargetAreaError);
+
+      const stored = mockWarningsStore.find((w) => w.warningId === draftId);
+      expect(stored?.status).toBe("DRAFT");
+      expect(stored?.dispatchStatus).toBe("NOT_SENT");
+    });
+
+    test("4.4 Custom error classes instantiate with correct properties and error codes", () => {
+      const defaultTargetAreaError = new InvalidTargetAreaError();
+      expect(defaultTargetAreaError.name).toBe("InvalidTargetAreaError");
+      expect(defaultTargetAreaError.code).toBe("NO_COVERAGE");
+      expect(defaultTargetAreaError.message).toBe("Invalid or uncovered target area boundary");
+
+      const targetAreaError = new InvalidTargetAreaError("Custom boundary error");
+      expect(targetAreaError.name).toBe("InvalidTargetAreaError");
+      expect(targetAreaError.code).toBe("NO_COVERAGE");
+      expect(targetAreaError.message).toBe("Custom boundary error");
+
+      const defaultNotFoundError = new WarningNotFoundError();
+      expect(defaultNotFoundError.name).toBe("WarningNotFoundError");
+      expect(defaultNotFoundError.code).toBe("WARNING_NOT_FOUND");
+      expect(defaultNotFoundError.message).toBe("Warning record not found");
+
+      const notFoundError = new WarningNotFoundError("Custom not found message");
+      expect(notFoundError.name).toBe("WarningNotFoundError");
+      expect(notFoundError.message).toBe("Custom not found message");
+
+      const stateError = new InvalidWarningStateError();
+      expect(stateError.name).toBe("InvalidWarningStateError");
+      expect(stateError.message).toBe("Invalid warning status transition");
+
+      const customStateError = new InvalidWarningStateError("Cannot transition from EXPIRED to ACTIVE");
+      expect(customStateError.message).toBe("Cannot transition from EXPIRED to ACTIVE");
+    });
   });
 
-  test("retryWarningDispatch() on an already-SENT warning is a no-op (idempotency)", async () => {
-    const draft = await createDraft(sampleInput, dummyUserId);
-    await issueWarning(draft.warningId);
+  // =========================================================================
+  // 5. IDEMPOTENCY & FAULT TOLERANCE TEST CASES
+  // =========================================================================
+  describe("5. Idempotency & Fault Tolerance Test Cases", () => {
+    test("5.1 issueWarning() on an already-ACTIVE warning is idempotent and avoids redundant re-dispatch", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const firstIssue = await issueWarning(draft.warningId);
+      expect(firstIssue.status).toBe("ACTIVE");
 
-    const spyDispatch = jest.spyOn(notificationService, "retryNotificationDispatch");
+      const spyDispatch = jest.spyOn(notificationService, "dispatchNotification");
 
-    await retryWarningDispatch(draft.warningId);
+      // Attempt to issue the warning a second time
+      const secondIssue = await issueWarning(draft.warningId);
 
-    expect(spyDispatch).toHaveBeenCalledWith(draft.warningId);
-    spyDispatch.mockRestore();
-  });
+      expect(secondIssue.status).toBe("ACTIVE");
+      expect(spyDispatch).not.toHaveBeenCalled(); // Preserves idempotency
+      spyDispatch.mockRestore();
+    });
 
-  test("Zod schema rejects validUntil <= validFrom, empty instructions, and missing hazardType", () => {
-    const invalidDateInput = {
-      ...sampleInput,
-      validFrom: new Date(2026, 5, 10),
-      validUntil: new Date(2026, 5, 9),
-    };
+    test("5.2 retryWarningDispatch() on an already-SENT warning is a no-op (idempotency)", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
 
-    expect(() => createWarningSchema.parse(invalidDateInput)).toThrow(ZodError);
+      const spyDispatch = jest.spyOn(notificationService, "retryNotificationDispatch");
 
-    const shortInstructionsInput = {
-      ...sampleInput,
-      instructions: "Short",
-    };
-    expect(() => createWarningSchema.parse(shortInstructionsInput)).toThrow(ZodError);
+      const result = await retryWarningDispatch(draft.warningId);
 
-    const missingHazardInput = {
-      ...sampleInput,
-      hazardType: undefined,
-    };
-    expect(() => createWarningSchema.parse(missingHazardInput)).toThrow(ZodError);
-  });
+      expect(result.dispatchStatus).toBe("SENT");
+      expect(spyDispatch).toHaveBeenCalledWith(draft.warningId);
+      spyDispatch.mockRestore();
+    });
 
-  test("getWarningById(), listActiveWarnings(), listAllWarnings() query helpers", async () => {
-    const draft1 = await createDraft(sampleInput, dummyUserId);
-    await issueWarning(draft1.warningId);
+    test("5.3 dispatch() when gateway throws 'UNAVAILABLE' sets PENDING_DISPATCH while warning remains ACTIVE", async () => {
+      const mockGateway = new notificationService.MockEmergencyGatewayClient();
+      mockGateway.setMode("UNAVAILABLE");
+      notificationService.setGatewayClient(mockGateway);
 
-    const draft2 = await createDraft(
-      { ...sampleInput, districtName: "Galle" },
-      dummyUserId
-    );
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const issued = await issueWarning(draft.warningId);
 
-    const fetched = await getWarningById(draft1.warningId);
-    expect(fetched?.warningId).toBe(draft1.warningId);
+      expect(issued.status).toBe("ACTIVE");
+      expect(issued.dispatchStatus).toBe("PENDING_DISPATCH");
+    });
 
-    const activeWarnings = await listActiveWarnings();
-    expect(activeWarnings.length).toBe(1);
-    expect(activeWarnings[0].warningId).toBe(draft1.warningId);
+    test("5.4 dispatch() when gateway throws CRITICAL_ERROR sets FAILED and populates errorLog while warning remains ACTIVE", async () => {
+      const mockGateway = new notificationService.MockEmergencyGatewayClient();
+      mockGateway.setMode("CRITICAL_ERROR");
+      notificationService.setGatewayClient(mockGateway);
 
-    const colomboActive = await listActiveWarnings("Colombo");
-    expect(colomboActive.length).toBe(1);
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const issued = await issueWarning(draft.warningId);
 
-    const galleActive = await listActiveWarnings("Galle");
-    expect(galleActive.length).toBe(0);
+      expect(issued.status).toBe("ACTIVE");
+      expect(issued.dispatchStatus).toBe("FAILED");
 
-    const allWarnings = await listAllWarnings();
-    expect(allWarnings.length).toBe(2);
-  });
+      const notificationRecord = mockNotificationsStore.find(
+        (n) => n.warningId?.toString() === draft._id?.toString()
+      );
+      expect(notificationRecord?.status).toBe("FAILED");
+      expect(notificationRecord?.errorLog).toContain("[CRITICAL_FAILURE]");
+    });
 
-  test("validateTargetArea() throws for empty district name and polygon with less than 4 points", () => {
-    expect(() => validateTargetArea("", validPolygon.coordinates)).toThrow(InvalidTargetAreaError);
-    expect(() => validateTargetArea("Colombo", [])).toThrow(InvalidTargetAreaError);
-  });
+    test("5.5 retryWarningDispatch() recovers PENDING_DISPATCH to SENT when gateway service is restored", async () => {
+      const mockGateway = new notificationService.MockEmergencyGatewayClient();
+      mockGateway.setMode("UNAVAILABLE");
+      notificationService.setGatewayClient(mockGateway);
 
-  test("estimateDistrictReach() returns default fallback for unmapped district names", () => {
-    const fallbackReach = estimateDistrictReach("UnknownRandomDistrictName");
-    expect(fallbackReach).toBe(150000);
-  });
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
 
-  test("issueWarning() throws WarningNotFoundError for non-existent UUID", async () => {
-    await expect(issueWarning("non-existent-uuid")).rejects.toThrow(WarningNotFoundError);
+      // Gateway restored to SUCCESS
+      mockGateway.setMode("SUCCESS");
+      const retried = await retryWarningDispatch(draft.warningId);
+
+      expect(retried.dispatchStatus).toBe("SENT");
+    });
   });
 });
