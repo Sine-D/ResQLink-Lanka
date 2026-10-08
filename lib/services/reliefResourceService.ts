@@ -69,34 +69,8 @@ export async function checkResourceAvailability(
     resource = await ReliefResource.findById(resourceId);
   }
 
-  // Graceful fallback for multi-agency resource IDs in demo mode
   if (!resource) {
-    const categoryName = resourceId.includes("WATER")
-      ? "WATER"
-      : resourceId.includes("FOOD")
-      ? "FOOD"
-      : resourceId.includes("MED")
-      ? "MEDICAL"
-      : null;
-    if (categoryName) {
-      resource = await ReliefResource.findOne({ category: categoryName });
-    }
-  }
-
-  if (!resource) {
-    resource = await ReliefResource.findOne({});
-  }
-
-  if (!resource) {
-    resource = await ReliefResource.create({
-      resourceId: resourceId || "RES-WATER-01",
-      name: "Water",
-      category: "WATER",
-      district: "Colombo",
-      quantity: 5000,
-      unit: "units",
-      minimumThreshold: 500,
-    });
+    throw new ResourceNotFoundError(`Relief resource '${resourceId}' not found`);
   }
 
   if (
@@ -109,8 +83,9 @@ export async function checkResourceAvailability(
   }
 
   if (resource.quantity < requestedQuantity) {
-    resource.quantity = Math.max(resource.quantity, requestedQuantity + 3500);
-    await resource.save();
+    throw new InsufficientStockError(
+      `Insufficient stock for '${resource.name}'. Requested: ${requestedQuantity}, Available: ${resource.quantity}`
+    );
   }
 
   return { resource, availableStock: resource.quantity };
