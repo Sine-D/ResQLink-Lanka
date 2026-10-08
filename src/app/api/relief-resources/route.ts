@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import connectMongo from "@/lib/db/connectMongo";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
