@@ -1,8 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, MapPin, Cloud, Bell, AlertTriangle, CheckCircle2, RotateCw } from "lucide-react";
+import { Search, MapPin, Cloud, Bell, AlertTriangle, CheckCircle2, RotateCw, Plus, X } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import dynamic from 'next/dynamic';
+
+const MapSelector = dynamic(() => import('@/components/MapSelector'), { ssr: false });
 
 const chartData = [
   { time: "08:00", occupancy: 3100, capacity: 8400 },
@@ -17,9 +20,110 @@ const chartData = [
 export default function ShelterPage() {
   const [evacueeCount, setEvacueeCount] = useState<string>("25");
   const [selectedShelter, setSelectedShelter] = useState<string>("SH-001");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showMapSelector, setShowMapSelector] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, name: string} | null>(null);
+
+  const handleAddShelter = (e: React.FormEvent) => {
+    e.preventDefault();
+    setShowAddModal(false);
+  };
 
   return (
     <div className="space-y-6 relative pb-12">
+      {showMapSelector && (
+        <MapSelector 
+          onLocationSelect={(lat, lng, name) => {
+            setSelectedLocation({ lat, lng, name: name || '' });
+            setShowMapSelector(false);
+          }}
+          onClose={() => setShowMapSelector(false)}
+        />
+      )}
+      {/* Add Shelter Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h3 className="text-xl font-bold text-white">Register New Shelter</h3>
+              <button 
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleAddShelter} className="p-6 space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Shelter Name</label>
+                  <input required type="text" placeholder="e.g. Royal College Main Hall" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Location / Address</label>
+                  <div className="flex gap-2">
+                    <input 
+                      required 
+                      type="text" 
+                      placeholder="e.g. Colombo 07" 
+                      className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                      value={selectedLocation ? selectedLocation.name : ''}
+                      onChange={(e) => setSelectedLocation(prev => prev ? {...prev, name: e.target.value} : {lat: 0, lng: 0, name: e.target.value})}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowMapSelector(true)} 
+                      className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      Map
+                    </button>
+                  </div>
+                  {selectedLocation && selectedLocation.lat !== 0 && (
+                     <div className="mt-2 text-xs text-blue-400 flex items-center gap-1.5 font-medium">
+                       <CheckCircle2 className="w-3.5 h-3.5" /> 
+                       Coordinates: {selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}
+                     </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Max Capacity</label>
+                    <input required type="number" placeholder="e.g. 500" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contact Phone</label>
+                    <input type="text" placeholder="e.g. 0771234567" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contact Person Name</label>
+                  <input type="text" placeholder="e.g. Mr. Silva" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Available Facilities</label>
+                  <textarea placeholder="e.g. Water, Electricity, Separate Toilets" rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"></textarea>
+                </div>
+              </div>
+              <div className="pt-4 flex gap-3 justify-end border-t border-slate-800 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddModal(false)}
+                  className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors"
+                >
+                  Register Shelter
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Top Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div className="flex items-center gap-4">
@@ -97,6 +201,10 @@ export default function ShelterPage() {
                 </div>
                 <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
                   All Status
+                </button>
+                <button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add Shelter
                 </button>
               </div>
             </div>
