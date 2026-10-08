@@ -1,7 +1,8 @@
 import React from "react";
+import Image from "next/image";
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
-import { ShieldAlert, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 export default function AboutPage() {
   return (
@@ -10,8 +11,8 @@ export default function AboutPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-16 space-y-8 flex-1">
         <div className="space-y-4 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-red-600/20 text-red-500 border border-red-500/30 flex items-center justify-center mx-auto">
-            <ShieldAlert className="w-7 h-7" />
+          <div className="w-16 h-16 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 flex items-center justify-center mx-auto shadow-xl shadow-red-600/20">
+            <Image src="/logo.jpg" alt="ResQLink Lanka Logo" width={64} height={64} className="w-full h-full object-cover" priority />
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white">About ResQLink Lanka</h1>
           <p className="text-slate-400 text-sm max-w-2xl mx-auto">

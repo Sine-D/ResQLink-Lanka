@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { ShieldAlert } from "lucide-react";
+import Image from "next/image";
 
 export const Footer: React.FC = () => {
   return (
@@ -8,7 +8,9 @@ export const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-white">
-            <ShieldAlert className="w-5 h-5 text-red-500" />
+            <div className="w-6 h-6 rounded-md overflow-hidden border border-slate-800 shrink-0">
+              <Image src="/logo.jpg" alt="Logo" width={24} height={24} className="w-full h-full object-cover" />
+            </div>
             <span className="font-bold text-base">ResQLink Lanka</span>
           </div>
           <p className="leading-relaxed text-slate-500">
