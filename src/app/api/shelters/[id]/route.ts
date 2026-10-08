@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import connectMongo from "@/lib/db/connectMongo";
 import Shelter from "@/lib/models/Shelter";
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectMongo();
+    const { id } = await params;
     const data = await req.json();
 
     if (data.capacity !== undefined && data.occupancy !== undefined) {
@@ -17,7 +18,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       }
     }
 
-    const updatedShelter = await Shelter.findByIdAndUpdate(params.id, data, { new: true });
+    const updatedShelter = await Shelter.findByIdAndUpdate(id, data, { new: true });
     
     if (!updatedShelter) {
       return NextResponse.json({ error: "Shelter not found" }, { status: 404 });
@@ -33,11 +34,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectMongo();
+    const { id } = await params;
     
-    const deletedShelter = await Shelter.findByIdAndDelete(params.id);
+    const deletedShelter = await Shelter.findByIdAndDelete(id);
     
     if (!deletedShelter) {
       return NextResponse.json({ error: "Shelter not found" }, { status: 404 });

@@ -35,6 +35,7 @@ export default function ShelterPage() {
     facilities: ''
   });
   const [editingShelterId, setEditingShelterId] = useState<string | null>(null);
+  const [selectedShelterDetails, setSelectedShelterDetails] = useState<any | null>(null);
 
   const fetchShelters = async () => {
     try {
@@ -55,6 +56,7 @@ export default function ShelterPage() {
   }, []);
 
   const handleEditClick = (shelter: any) => {
+    setSelectedShelterDetails(null);
     setEditingShelterId(shelter._id);
     setNewShelter({
       name: shelter.name,
@@ -227,6 +229,89 @@ export default function ShelterPage() {
           </div>
         </div>
       )}
+      {/* Details Modal */}
+      {selectedShelterDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h3 className="text-xl font-bold text-white">Shelter Details</h3>
+              <button 
+                onClick={() => setSelectedShelterDetails(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm text-slate-300">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Shelter ID</span>
+                  <span className="font-bold text-white">{selectedShelterDetails.shelterId}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Status</span>
+                  <span className={`font-bold ${selectedShelterDetails.status === 'FULL' ? 'text-red-500' : selectedShelterDetails.status === 'NEAR CAPACITY' ? 'text-orange-400' : 'text-emerald-400'}`}>
+                    {selectedShelterDetails.status}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <span className="block text-xs font-semibold text-slate-500 mb-1">Name</span>
+                <span className="text-white">{selectedShelterDetails.name}</span>
+              </div>
+              <div>
+                <span className="block text-xs font-semibold text-slate-500 mb-1">Location</span>
+                <span className="text-white">{selectedShelterDetails.location}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Capacity</span>
+                  <span className="text-white">{selectedShelterDetails.capacity}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Occupancy</span>
+                  <span className="text-white">{selectedShelterDetails.occupancy}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Avg Family</span>
+                  <span className="text-white">{selectedShelterDetails.averageFamilySize || 4}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Contact Person</span>
+                  <span className="text-white">{selectedShelterDetails.contactPerson || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone</span>
+                  <span className="text-white">{selectedShelterDetails.contactPhone || 'N/A'}</span>
+                </div>
+              </div>
+              <div>
+                <span className="block text-xs font-semibold text-slate-500 mb-1">Facilities</span>
+                <span className="text-white">{selectedShelterDetails.facilities || 'N/A'}</span>
+              </div>
+            </div>
+            <div className="p-5 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/50">
+              <button 
+                onClick={() => handleEditClick(selectedShelterDetails)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+              >
+                <Edit2 className="w-4 h-4" /> Edit
+              </button>
+              <button 
+                onClick={() => {
+                  handleDeleteShelter(selectedShelterDetails._id);
+                  setSelectedShelterDetails(null);
+                }}
+                className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Top Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div className="flex items-center gap-4">
@@ -335,7 +420,7 @@ export default function ShelterPage() {
                       <td colSpan={7} className="py-8 text-center text-slate-500">No shelters found. Register a new one.</td>
                     </tr>
                   ) : shelters.map((shelter) => (
-                    <tr key={shelter._id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr key={shelter._id} onClick={() => setSelectedShelterDetails(shelter)} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
                       <td className="py-4 px-4 font-bold text-white">{shelter.shelterId} - {shelter.name}</td>
                       <td className="py-4 px-4 text-slate-400">{shelter.location}</td>
                       <td className="py-4 px-4 text-slate-400 whitespace-nowrap">
@@ -348,31 +433,16 @@ export default function ShelterPage() {
                         {shelter.status}
                       </td>
                       <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button 
-                            onClick={() => handleEditClick(shelter)}
-                            className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded transition-colors"
-                            title="Edit Shelter"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteShelter(shelter._id)}
-                            className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded transition-colors"
-                            title="Delete Shelter"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <button 
-                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ml-2 ${
-                              shelter.status === 'FULL' 
-                                ? 'bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed'
-                                : 'bg-slate-800 border border-slate-700 text-white hover:bg-slate-700'
-                            }`}
-                          >
-                            {shelter.status === 'FULL' ? 'Full' : 'Allocate'}
-                          </button>
-                        </div>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); /* allocate logic here */ }}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ml-2 ${
+                            shelter.status === 'FULL' 
+                              ? 'bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed'
+                              : 'bg-slate-800 border border-slate-700 text-white hover:bg-slate-700'
+                          }`}
+                        >
+                          {shelter.status === 'FULL' ? 'Full' : 'Allocate'}
+                        </button>
                       </td>
                     </tr>
                   ))}
