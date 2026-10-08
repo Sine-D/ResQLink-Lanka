@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Search, MapPin, Cloud, Bell, AlertTriangle, CheckCircle2, RotateCw, Plus, X, Edit2, Trash2 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import dynamic from 'next/dynamic';
+import { useSession } from "next-auth/react";
 
 const MapSelector = dynamic(() => import('@/components/MapSelector'), { ssr: false });
 
@@ -36,6 +37,17 @@ export default function ShelterPage() {
   });
   const [editingShelterId, setEditingShelterId] = useState<string | null>(null);
   const [selectedShelterDetails, setSelectedShelterDetails] = useState<any | null>(null);
+
+  const { data: session } = useSession();
+  const userName = session?.user?.name || "D. Perera";
+  const userRole = (session?.user as { role?: string })?.role || "District Officer";
+
+  const totalShelters = shelters.length;
+  const availableShelters = shelters.filter(s => s.status === 'AVAILABLE').length;
+  const fullShelters = shelters.filter(s => s.status === 'FULL').length;
+  const totalCapacity = shelters.reduce((acc, curr) => acc + (curr.capacity || 0), 0);
+  const currentOccupancy = shelters.reduce((acc, curr) => acc + (curr.occupancy || 0), 0);
+  const availableSpaces = totalCapacity - currentOccupancy;
 
   const fetchShelters = async () => {
     try {
@@ -332,11 +344,11 @@ export default function ShelterPage() {
           </div>
           <div className="flex items-center gap-3 border-l border-slate-800 pl-6">
             <div className="text-right">
-              <div className="text-sm font-bold text-white">D. Perera</div>
-              <div className="text-xs text-slate-500">District Officer</div>
+              <div className="text-sm font-bold text-white">{userName}</div>
+              <div className="text-xs text-slate-500 capitalize">{userRole.replace("_", " ").toLowerCase()}</div>
             </div>
-            <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 font-bold">
-              DP
+            <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 font-bold uppercase">
+              {userName.split(' ').map(n => n[0]).join('').substring(0, 2)}
             </div>
           </div>
         </div>
@@ -346,27 +358,27 @@ export default function ShelterPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Total Shelters</div>
-          <div className="text-3xl font-black text-white">42</div>
+          <div className="text-3xl font-black text-white">{totalShelters}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Available</div>
-          <div className="text-3xl font-black text-emerald-400">31</div>
+          <div className="text-3xl font-black text-emerald-400">{availableShelters}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Full</div>
-          <div className="text-3xl font-black text-red-400">11</div>
+          <div className="text-3xl font-black text-red-400">{fullShelters}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Total Capacity</div>
-          <div className="text-3xl font-black text-white">8,400</div>
+          <div className="text-3xl font-black text-white">{totalCapacity.toLocaleString()}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Current Occupancy</div>
-          <div className="text-3xl font-black text-white">5,120</div>
+          <div className="text-3xl font-black text-white">{currentOccupancy.toLocaleString()}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Available Spaces</div>
-          <div className="text-3xl font-black text-blue-400">3,280</div>
+          <div className="text-3xl font-black text-blue-400">{availableSpaces.toLocaleString()}</div>
         </div>
       </div>
 
