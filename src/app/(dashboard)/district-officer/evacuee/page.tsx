@@ -23,6 +23,7 @@ export default function EvacueePage() {
     householdSize: 1,
     vulnerability: "",
     originAddress: "",
+    contactNumber: "",
     gpsStatus: "40.7128° N, 74.0060° W (Active)"
   });
 
@@ -38,6 +39,35 @@ export default function EvacueePage() {
   const [evacuees, setEvacuees] = useState<any[]>([]);
   const [saturationPercentage, setSaturationPercentage] = useState(0);
   const [resourcesDeployedPercentage, setResourcesDeployedPercentage] = useState(0);
+  
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [isDispatching, setIsDispatching] = useState(false);
+
+  const handleDispatchAlert = async () => {
+    if (!alertMessage) return;
+    setIsDispatching(true);
+    try {
+      const res = await fetch("/api/evacuees/dispatch-alert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: alertMessage })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Successfully dispatched alert to ${data.count} registered evacuees.`);
+        setIsAlertModalOpen(false);
+        setAlertMessage("");
+      } else {
+        alert("Failed to dispatch alert.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error dispatching alert.");
+    } finally {
+      setIsDispatching(false);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -174,6 +204,7 @@ export default function EvacueePage() {
           householdSize: 1,
           vulnerability: "",
           originAddress: "",
+          contactNumber: "",
           gpsStatus: "40.7128° N, 74.0060° W (Active)"
         });
         setHouseholdMembers([]);
@@ -201,11 +232,10 @@ export default function EvacueePage() {
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-right text-xs text-slate-400">
-            <div>Last Updated</div>
-            <div className="font-mono font-bold text-slate-300">14:22:05 UTC</div>
-          </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-bold transition-colors">
+          <button 
+            onClick={() => setIsAlertModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-bold transition-colors"
+          >
             Dispatch Alert
           </button>
         </div>
@@ -267,15 +297,27 @@ export default function EvacueePage() {
                     />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Origin Address</label>
-                  <textarea 
-                    rows={2} 
-                    value={formData.originAddress}
-                    onChange={(e) => setFormData({...formData, originAddress: e.target.value})}
-                    placeholder="Enter origin address" 
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
-                  ></textarea>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-400 uppercase">Contact Number</label>
+                    <input 
+                      type="text" 
+                      value={formData.contactNumber}
+                      onChange={(e) => setFormData({...formData, contactNumber: e.target.value})}
+                      placeholder="e.g., 077 123 4567" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-400 uppercase">Origin Address</label>
+                    <textarea 
+                      rows={1} 
+                      value={formData.originAddress}
+                      onChange={(e) => setFormData({...formData, originAddress: e.target.value})}
+                      placeholder="Enter origin address" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
+                    ></textarea>
+                  </div>
                 </div>
                 
                 {/* Dynamic Fields for other household members */}
@@ -473,6 +515,44 @@ export default function EvacueePage() {
           onLocationSelect={handleLocationSelect} 
           onClose={() => setIsMapModalOpen(false)} 
         />
+      )}
+
+      {/* Alert Modal */}
+      {isAlertModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <h2 className="text-xl font-bold text-white">Dispatch Emergency Alert</h2>
+            <p className="text-sm text-slate-400">
+              Send an SMS alert to all registered evacuees with contact numbers.
+            </p>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-400 uppercase">Alert Message</label>
+              <textarea 
+                rows={3} 
+                value={alertMessage}
+                onChange={(e) => setAlertMessage(e.target.value)}
+                placeholder="e.g., Evacuate immediately to higher ground." 
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
+              ></textarea>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button 
+                onClick={() => setIsAlertModalOpen(false)}
+                className="px-4 py-2 text-sm font-bold text-slate-300 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDispatchAlert}
+                disabled={isDispatching || !alertMessage}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+              >
+                {isDispatching && <Loader2 className="w-4 h-4 animate-spin" />}
+                Send Alert
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

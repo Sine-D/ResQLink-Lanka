@@ -14,6 +14,7 @@ export interface IEvacuee extends Document {
   householdSize: number;
   vulnerability: string;
   originAddress: string;
+  contactNumber: string;
   gpsStatus: string;
   householdMembers: IHouseholdMember[];
   allocatedShelterId?: string;
@@ -35,6 +36,7 @@ const EvacueeSchema = new Schema<IEvacuee>(
     householdSize: { type: Number, required: true, default: 1 },
     vulnerability: { type: String, default: "" },
     originAddress: { type: String, required: true },
+    contactNumber: { type: String, default: "" },
     gpsStatus: { type: String, default: "" },
     householdMembers: { type: [HouseholdMemberSchema], default: [] },
     allocatedShelterId: { type: String, default: null },
