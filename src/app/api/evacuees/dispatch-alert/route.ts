@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { EvacueeMongoRepository } from "@/lib/repositories/EvacueeMongoRepository";
 import { SmsServiceFactory } from "@/lib/services/sms/SmsServiceFactory";
-import { AlertDispatchService } from "@/lib/services/alert/AlertDispatchService";
+import { AlertDispatchService } from "@/lib/services/alertDispatchService";
 
 export async function POST(request: NextRequest) {
   try {
