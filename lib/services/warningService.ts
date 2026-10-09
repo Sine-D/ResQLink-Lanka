@@ -388,3 +388,77 @@ export async function listAllWarnings(): Promise<IWarning[]> {
     .populate("issuedBy", "name email role")
     .sort({ createdAt: -1 });
 }
+
+/**
+ * Updates an existing unissued disaster warning draft (Flow A3).
+ *
+ * @param warningId - Unique business identifier of the warning.
+ * @param input - Partial update fields.
+ * @returns Promise resolving to the updated Warning document.
+ */
+export async function updateDraft(
+  warningId: string,
+  input: Partial<CreateWarningInput>
+): Promise<IWarning> {
+  const warning = await Warning.findOne({ warningId });
+  if (!warning) {
+    throw new WarningNotFoundError(`Disaster Warning with ID ${warningId} does not exist`);
+  }
+  if (warning.status !== "DRAFT") {
+    throw new InvalidWarningStateError(`Cannot edit a warning that is currently '${warning.status}'`);
+  }
+
+  if (input.hazardType) warning.hazardType = input.hazardType;
+  if (input.severity) warning.severity = input.severity;
+  if (input.instructions) warning.instructions = input.instructions;
+  if (input.validFrom) warning.validFrom = new Date(input.validFrom);
+  if (input.validUntil) warning.validUntil = new Date(input.validUntil);
+  if (input.sourceIncidentId !== undefined) warning.sourceIncidentId = input.sourceIncidentId || undefined;
+
+  if (input.districtName || input.coordinates) {
+    const districtName = input.districtName || warning.targetArea.districtName;
+    const coordinates = input.coordinates || warning.targetArea.coordinates;
+    TargetArea.validateArea(districtName, coordinates.coordinates);
+    const estimatedReach = estimateDistrictReach(districtName);
+    warning.targetArea = {
+      districtName,
+      coordinates,
+      estimatedReach,
+    };
+  }
+
+  await warning.save();
+  return warning;
+}
+
+/**
+ * Automatically marks warning as EXPIRED when validUntil date has passed.
+ *
+ * @param warningId - Unique business identifier of the warning.
+ * @returns Promise resolving to the warning document or null.
+ */
+export async function checkAndExpireWarning(warningId: string): Promise<IWarning | null> {
+  const warning = await Warning.findOne({ warningId });
+  if (!warning) return null;
+
+  if (warning.status === "ACTIVE" && new Date(warning.validUntil) <= new Date()) {
+    warning.status = "EXPIRED";
+    await warning.save();
+  }
+
+  return warning;
+}
+
+/**
+ * Automatically checks and marks all active warnings whose validUntil date has passed as EXPIRED.
+ */
+export async function checkAndExpireAllActiveWarnings(): Promise<number> {
+  const result = await Warning.updateMany(
+    {
+      status: "ACTIVE",
+      validUntil: { $lte: new Date() },
+    },
+    { $set: { status: "EXPIRED" } }
+  );
+  return result.modifiedCount || 0;
+}

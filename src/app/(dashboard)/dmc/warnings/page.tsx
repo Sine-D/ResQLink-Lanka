@@ -62,12 +62,12 @@ export default function ActiveWarningsDashboard() {
             Disaster Early-Warning Command Dashboard
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Member 1 Module: Monitor active location-based emergency broadcasts and delivery statuses
+            Monitor active location-based emergency broadcasts and delivery statuses
           </p>
         </div>
 
         <Link
-          href="/dmc/warnings/new"
+          href="/broadcast/create"
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs tracking-wide shadow-lg shadow-red-600/30 transition-all"
         >
           <PlusCircle className="w-4 h-4" />
@@ -178,18 +178,18 @@ export default function ActiveWarningsDashboard() {
 
                         {warning.status === "DRAFT" ? (
                           <Link
-                            href={`/dmc/warnings/${warning.warningId}/review`}
+                            href={`/broadcast/review/${warning.warningId}`}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] transition-all"
                           >
                             <span>Review & Issue</span>
                           </Link>
                         ) : (
                           <Link
-                            href={`/dmc/warnings/${warning.warningId}`}
+                            href={`/broadcast/summary/${warning.warningId}`}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition-all"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            <span>Details</span>
+                            <span>Delivery Summary</span>
                           </Link>
                         )}
                       </td>

@@ -21,10 +21,10 @@ export const Footer: React.FC = () => {
         <div>
           <h4 className="font-bold text-white uppercase tracking-wider mb-3">System Modules</h4>
           <ul className="space-y-2">
-            <li><Link href="/dmc/warnings" className="hover:text-red-400">1. Disaster Warning & Alerts (Full)</Link></li>
-            <li><Link href="/citizen/report-hazard" className="hover:text-red-400">2. Citizen Hazard Reporting (Stub)</Link></li>
-            <li><Link href="/district-officer/incidents" className="hover:text-red-400">3. Rescue Team Dispatch (Stub)</Link></li>
-            <li><Link href="/dmc/relief-resources" className="hover:text-red-400">4. Relief Distribution (Stub)</Link></li>
+            <li><Link href="/dmc/warnings" className="hover:text-red-400">1. Disaster Warning & Alerts</Link></li>
+            <li><Link href="/citizen/report-hazard" className="hover:text-red-400">2. Citizen Hazard Reporting</Link></li>
+            <li><Link href="/district-officer/incidents" className="hover:text-red-400">3. Rescue Team Dispatch</Link></li>
+            <li><Link href="/dmc/relief-resources" className="hover:text-red-400">4. Relief Distribution</Link></li>
           </ul>
         </div>
 
@@ -39,9 +39,9 @@ export const Footer: React.FC = () => {
         </div>
 
         <div>
-          <h4 className="font-bold text-white uppercase tracking-wider mb-3">Academic Disclaimer</h4>
+          <h4 className="font-bold text-white uppercase tracking-wider mb-3">System Overview</h4>
           <p className="leading-relaxed text-slate-500">
-            SE3070 Coursework Assignment A02 Deliverable. Built strictly for demonstration and academic evaluation purposes.
+            ResQLink Lanka is dedicated to real-time disaster early warnings, rapid emergency response coordination, and transparent relief distribution across Sri Lanka.
           </p>
         </div>
       </div>

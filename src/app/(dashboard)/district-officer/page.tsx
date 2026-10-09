@@ -62,7 +62,7 @@ export default function ActiveWarningsDashboard() {
             Disaster Early-Warning Command Dashboard
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Member 1 Module: Monitor active location-based emergency broadcasts and delivery statuses
+            Monitor active location-based emergency broadcasts and delivery statuses
           </p>
         </div>
 
