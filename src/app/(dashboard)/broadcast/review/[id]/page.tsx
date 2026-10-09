@@ -81,6 +81,26 @@ export default function BroadcastReviewDetailPage({ params }: ReviewPageProps) {
     setIssuing(true);
     setError("");
 
+    // Trigger Warning Alarm audio immediately on direct user click gesture
+    try {
+      if (typeof window !== "undefined") {
+        if ((window as any).__warningAlarmAudio) {
+          try {
+            (window as any).__warningAlarmAudio.pause();
+          } catch {}
+        }
+        const audio = new Audio("/warning_alarm.mp3");
+        audio.volume = 1.0;
+        audio.loop = true;
+        (window as any).__warningAlarmAudio = audio;
+        audio.play().catch((err) => {
+          console.warn("Audio autoplay blocked by browser policy:", err);
+        });
+      }
+    } catch (err) {
+      console.warn("Audio initialization error:", err);
+    }
+
     try {
       const res = await fetch(`/api/warnings/${id}/issue`, {
         method: "POST",
@@ -88,14 +108,24 @@ export default function BroadcastReviewDetailPage({ params }: ReviewPageProps) {
 
       const data = await res.json();
       if (!res.ok) {
+        if (typeof window !== "undefined" && (window as any).__warningAlarmAudio) {
+          try {
+            (window as any).__warningAlarmAudio.pause();
+          } catch {}
+        }
         setError(data.message || data.error || "Broadcast dispatch failed.");
         setIssuing(false);
         setShowConfirmModal(false);
       } else {
         setShowConfirmModal(false);
-        router.push(`/broadcast/summary/${warning.warningId}`);
+        router.push(`/broadcast/summary/${warning.warningId}?alarm=true`);
       }
     } catch {
+      if (typeof window !== "undefined" && (window as any).__warningAlarmAudio) {
+        try {
+          (window as any).__warningAlarmAudio.pause();
+        } catch {}
+      }
       setError("Emergency broadcast dispatch request failed.");
       setIssuing(false);
       setShowConfirmModal(false);
