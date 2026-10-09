@@ -37,19 +37,6 @@
 └───────────────────────────────┘        └───────────────────────────────┘       └───────────────────────────────┘
 ```
 
----
-
-## 🧩 Core Modules Scope Breakdown
-
-| Icon | Module Name | Scope | Key Features & Implementation Status |
-| :---: | :--- | :---: | :--- |
-| 📡 | **1. Disaster Warning & Alert Management** | 🔴 **FULL (UC1)** | • Interactive Real Sri Lanka Leaflet GIS Map with 25 district polygons.<br>• MongoDB-filtered verified incident autofill (`Incident` + `HazardReport`).<br>• Census-calibrated demographic audience reach estimator.<br>• E1 & E2 validation (Zod schema + polygon vertex closure checks).<br>• E3 Duplicate/overlapping active warning detection.<br>• High-severity authorization confirmation modal with exact headcount.<br>• Real device speaker alarm siren auto-play (`/warning_alarm.mp3`).<br>• Complete **CRUD** (Create, Read, Edit Draft, Hard Delete Draft, Cancel Warning).<br>• Step 13 Real-time delivery statistics dashboard & gateway retry mechanism. |
-| ⚠️ | **2. Citizen Hazard Reporting** | 🟡 **STUB** | Citizen hazard submission form (`PENDING_VERIFICATION`), DMC verification queue, stub endpoints, and `README-TODO.md` for offline queues & photo uploads. |
-| 🚒 | **3. Rescue Team Dispatch** | 🟡 **STUB** | Emergency incident model, Navy/Army rescue team registry, team dispatch interface, stub endpoints, and `README-TODO.md` for GPS tracking. |
-| 📦 | **4. Relief Resource Distribution** | 🟡 **STUB** | Central warehouse inventory stock tracking, stock deduction logs, stub endpoints, and `README-TODO.md` for Recharts analytics & low-stock alerts. |
-
----
-
 ## 📡 UC1: Issue Location-Based Disaster Warning (Detailed Workflow)
 
 The Disaster Warning subsystem implements a rigorous multi-stage operational workflow:
