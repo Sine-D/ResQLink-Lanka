@@ -19,6 +19,9 @@ import {
   getWarningDeliverySummary,
   OverlappingWarningError,
   deleteDraft,
+  updateDraft,
+  checkAndExpireWarning,
+  checkAndExpireAllActiveWarnings,
 } from "../../lib/services/warningService";
 import * as notificationService from "../../lib/services/notificationService";
 import { createWarningSchema, geoJSONPolygonSchema } from "../../lib/validation/warningSchema";
@@ -199,6 +202,20 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
 
     (NotificationModel.deleteMany as jest.Mock).mockImplementation(() => {
       return Promise.resolve({ deletedCount: 1 });
+    });
+
+    (Warning.updateMany as jest.Mock).mockImplementation((query: any, update: any) => {
+      let count = 0;
+      mockWarningsStore.forEach((w) => {
+        let match = true;
+        if (query.status && w.status !== query.status) match = false;
+        if (query.validUntil?.$lte && new Date(w.validUntil) > query.validUntil.$lte) match = false;
+        if (match) {
+          if (update.$set) Object.assign(w, update.$set);
+          count++;
+        }
+      });
+      return Promise.resolve({ modifiedCount: count });
     });
   });
 
@@ -764,5 +781,330 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
     test("6.12 deleteDraft() throws WarningNotFoundError for non-existent warning ID", async () => {
       await expect(deleteDraft("non-existent-draft-id")).rejects.toThrow(WarningNotFoundError);
     });
+
+    test("6.13 updateDraft() successfully updates hazardType, severity, instructions, and time window on DRAFT warning (Flow A3)", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const updated = await updateDraft(draft.warningId, {
+        hazardType: "Landslide",
+        severity: "Critical",
+        instructions: "Immediate evacuation ordered for mountainous zones.",
+        validFrom: new Date(2026, 7, 1),
+        validUntil: new Date(2026, 7, 3),
+      });
+
+      expect(updated.hazardType).toBe("Landslide");
+      expect(updated.severity).toBe("Critical");
+      expect(updated.instructions).toBe("Immediate evacuation ordered for mountainous zones.");
+      expect(new Date(updated.validFrom).getTime()).toBe(new Date(2026, 7, 1).getTime());
+    });
+
+    test("6.14 updateDraft() updates districtName and coordinates, re-validates boundary and re-calculates estimatedReach", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const kandyPolygon = {
+        type: "Polygon" as const,
+        coordinates: [
+          [
+            [80.60, 7.28] as [number, number],
+            [80.65, 7.28] as [number, number],
+            [80.65, 7.32] as [number, number],
+            [80.60, 7.32] as [number, number],
+            [80.60, 7.28] as [number, number],
+          ],
+        ],
+      };
+
+      const updated = await updateDraft(draft.warningId, {
+        districtName: "Kandy",
+        coordinates: kandyPolygon,
+      });
+
+      expect(updated.targetArea.districtName).toBe("Kandy");
+      expect(updated.targetArea.estimatedReach).toBe(400000); // Kandy density lookup
+    });
+
+    test("6.15 updateDraft() updates sourceIncidentId linkage on draft warning", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const updated = await updateDraft(draft.warningId, {
+        sourceIncidentId: "INC-2026-9999",
+      });
+
+      expect(updated.sourceIncidentId).toBe("INC-2026-9999");
+    });
+
+    test("6.16 updateDraft() throws InvalidWarningStateError when attempting to edit an ACTIVE warning", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
+
+      await expect(
+        updateDraft(draft.warningId, { instructions: "New instructions after active" })
+      ).rejects.toThrow(InvalidWarningStateError);
+    });
+
+    test("6.17 updateDraft() throws WarningNotFoundError for non-existent warning ID", async () => {
+      await expect(
+        updateDraft("non-existent-draft-update", { instructions: "New instructions" })
+      ).rejects.toThrow(WarningNotFoundError);
+    });
+
+    test("6.18 checkAndExpireWarning() transitions an ACTIVE warning to EXPIRED when validUntil has passed", async () => {
+      const draft = await createDraft(
+        {
+          ...sampleInput,
+          validFrom: new Date(Date.now() - 1000 * 60 * 60 * 24), // -24 hours ago
+          validUntil: new Date(Date.now() - 1000 * 60), // -1 minute ago
+        },
+        dummyUserId
+      );
+      await issueWarning(draft.warningId);
+
+      const expired = await checkAndExpireWarning(draft.warningId);
+      expect(expired).not.toBeNull();
+      expect(expired?.status).toBe("EXPIRED");
+    });
+
+    test("6.19 checkAndExpireWarning() retains ACTIVE status when validUntil is in the future", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
+
+      const current = await checkAndExpireWarning(draft.warningId);
+      expect(current?.status).toBe("ACTIVE");
+    });
+
+    test("6.20 checkAndExpireWarning() returns null for non-existent warning ID", async () => {
+      const result = await checkAndExpireWarning("non-existent-expire-id");
+      expect(result).toBeNull();
+    });
+
+    test("6.21 checkAndExpireAllActiveWarnings() batch updates multiple past-due active warnings to EXPIRED", async () => {
+      const draft1 = await createDraft(
+        {
+          ...sampleInput,
+          validFrom: new Date(Date.now() - 1000 * 60 * 60 * 48), // -48 hours ago
+          validUntil: new Date(Date.now() - 1000 * 60),
+        },
+        dummyUserId
+      );
+      const draft2 = await createDraft(
+        {
+          ...sampleInput,
+          validFrom: new Date(Date.now() - 1000 * 60 * 60 * 48), // -48 hours ago
+          validUntil: new Date(Date.now() - 1000 * 120),
+        },
+        dummyUserId
+      );
+      await issueWarning(draft1.warningId);
+      await issueWarning(draft2.warningId);
+
+      const count = await checkAndExpireAllActiveWarnings();
+      expect(count).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  // 7. COMPREHENSIVE REGIONAL & DISASTER DOMAIN SCENARIOS
+  describe("7. Comprehensive Regional & Disaster Domain Scenarios", () => {
+    test("7.1 Multi-district overlapping active warning check isolates districts correctly", async () => {
+      const colomboDraft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(colomboDraft.warningId);
+
+      // Check overlap for Gampaha with same hazard: should NOT overlap
+      const gampahaOverlap = await checkOverlappingActiveWarning("Gampaha", "Flood");
+      expect(gampahaOverlap).toBeNull();
+
+      // Check overlap for Colombo with same hazard: SHOULD overlap
+      const colomboOverlap = await checkOverlappingActiveWarning("Colombo", "Flood");
+      expect(colomboOverlap).not.toBeNull();
+      expect(colomboOverlap?.warningId).toBe(colomboDraft.warningId);
+    });
+
+    test("7.2 listActiveWarnings() returns empty array when no active warnings match the specified district", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
+
+      const jaffnaWarnings = await listActiveWarnings("Jaffna");
+      expect(jaffnaWarnings).toEqual([]);
+    });
+
+    test("7.3 Supports all 6 domain hazard types across provincial centers", async () => {
+      const hazards = ["Flood", "Landslide", "Cyclone", "Tsunami", "Drought", "FlashFlood"] as const;
+      for (const hazard of hazards) {
+        const draft = await createDraft({ ...sampleInput, hazardType: hazard }, dummyUserId);
+        expect(draft.hazardType).toBe(hazard);
+      }
+    });
+
+    test("7.4 getWarningById() successfully populates issuedBy officer credentials", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const populated = await getWarningById(draft.warningId);
+
+      expect(populated).not.toBeNull();
+      expect(populated?.issuedBy).toBeDefined();
+      expect((populated?.issuedBy as any).name).toBe("Officer Perera");
+      expect((populated?.issuedBy as any).role).toBe("DMC_OFFICER");
+    });
+
+    test("7.5 retryWarningDispatch() handles recovered gateways and persists SENT dispatch status", async () => {
+      const mockGateway = new notificationService.MockEmergencyGatewayClient();
+      mockGateway.setMode("UNAVAILABLE"); // Fail initially
+      notificationService.setGatewayClient(mockGateway);
+
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const active = await issueWarning(draft.warningId);
+      expect(active.dispatchStatus).toBe("PENDING_DISPATCH");
+
+      // Recover gateway
+      mockGateway.setMode("SUCCESS");
+      const recovered = await retryWarningDispatch(draft.warningId);
+      expect(recovered.dispatchStatus).toBe("SENT");
+    });
+  });
+
+  // 8. UNCOVERED BRANCH & METRIC EDGE CASE COVERAGE
+  describe("8. Uncovered Branch & Metric Edge Case Coverage", () => {
+    test("8.1 getWarningDeliverySummary() handles FAILED and PENDING_DISPATCH dispatchStatus states", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
+
+      const storeIdx = mockWarningsStore.findIndex((w) => w.warningId === draft.warningId);
+
+      // Mutate to FAILED
+      mockWarningsStore[storeIdx].dispatchStatus = "FAILED";
+      const failedSummary = await getWarningDeliverySummary(draft.warningId);
+      expect(failedSummary.failedCount).toBe(mockWarningsStore[storeIdx].targetArea.estimatedReach);
+      expect(failedSummary.sentCount).toBe(0);
+
+      // Mutate to PENDING_DISPATCH
+      mockWarningsStore[storeIdx].dispatchStatus = "PENDING_DISPATCH";
+      const pendingSummary = await getWarningDeliverySummary(draft.warningId);
+      expect(pendingSummary.pendingCount).toBe(mockWarningsStore[storeIdx].targetArea.estimatedReach);
+      expect(pendingSummary.sentCount).toBe(0);
+
+      // Mutate estimatedReach to 0
+      mockWarningsStore[storeIdx].targetArea.estimatedReach = 0;
+      mockWarningsStore[storeIdx].dispatchStatus = "SENT";
+      const zeroReachSummary = await getWarningDeliverySummary(draft.warningId);
+      expect(zeroReachSummary.totalTargetReach).toBe(0);
+      expect(zeroReachSummary.sentCount).toBe(0);
+    });
+
+    test("8.2 getWarningDeliverySummary() handles missing notification record and zero estimated reach", async () => {
+      const draft = await createDraft(
+        { ...sampleInput, districtName: "UnknownDistrict" },
+        dummyUserId
+      );
+      // Clear out any notification record
+      mockNotificationsStore = [];
+
+      const summary = await getWarningDeliverySummary(draft.warningId);
+      expect(summary.channel).toBe("BOTH");
+      expect(summary.retryCount).toBe(0);
+      expect(summary.totalTargetReach).toBeGreaterThanOrEqual(0);
+    });
+
+    test("8.3 updateDraft() with partial updates: ONLY districtName without coordinates", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const updated = await updateDraft(draft.warningId, {
+        districtName: "Galle",
+      });
+      expect(updated.targetArea.districtName).toBe("Galle");
+      expect(updated.targetArea.estimatedReach).toBe(300000);
+      expect(updated.targetArea.coordinates).toEqual(sampleInput.coordinates);
+    });
+
+    test("8.4 updateDraft() with partial updates: ONLY coordinates without districtName", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const newPolygon = {
+        type: "Polygon" as const,
+        coordinates: [
+          [
+            [79.85, 6.91] as [number, number],
+            [79.89, 6.91] as [number, number],
+            [79.89, 6.97] as [number, number],
+            [79.85, 6.97] as [number, number],
+            [79.85, 6.91] as [number, number],
+          ],
+        ],
+      };
+      const updated = await updateDraft(draft.warningId, {
+        coordinates: newPolygon,
+      });
+      expect(updated.targetArea.districtName).toBe("Colombo");
+      expect(updated.targetArea.coordinates).toEqual(newPolygon);
+    });
+
+    test("8.5 updateDraft() handles sourceIncidentId being set and being cleared", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const updatedWithId = await updateDraft(draft.warningId, {
+        sourceIncidentId: "INC-REPLACE-123",
+      });
+      expect(updatedWithId.sourceIncidentId).toBe("INC-REPLACE-123");
+
+      const clearedWithEmpty = await updateDraft(draft.warningId, {
+        sourceIncidentId: "",
+      });
+      expect(clearedWithEmpty.sourceIncidentId).toBeUndefined();
+    });
+
+    test("8.6 checkAndExpireAllActiveWarnings() returns 0 when no active warnings are modified", async () => {
+      (Warning.updateMany as jest.Mock).mockResolvedValueOnce({ modifiedCount: 0 });
+      const count = await checkAndExpireAllActiveWarnings();
+      expect(count).toBe(0);
+
+      (Warning.updateMany as jest.Mock).mockResolvedValueOnce({});
+      const countFallback = await checkAndExpireAllActiveWarnings();
+      expect(countFallback).toBe(0);
+    });
+
+    test("8.7 Fallback to in-memory warning if findOne returns null during re-fetch in issue, cancel, and retry", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      const originalImpl = (Warning.findOne as jest.Mock).getMockImplementation()!;
+
+      // Issue fallback
+      let issueLookups = 0;
+      (Warning.findOne as jest.Mock).mockImplementation((query: any) => {
+        if (query.warningId === draft.warningId) {
+          issueLookups++;
+          if (issueLookups === 2) {
+            return Promise.resolve(null);
+          }
+        }
+        return originalImpl(query);
+      });
+      const issued = await issueWarning(draft.warningId);
+      expect(issued).toBeDefined();
+
+      // Cancel fallback
+      let cancelLookups = 0;
+      (Warning.findOne as jest.Mock).mockImplementation((query: any) => {
+        if (query.warningId === draft.warningId) {
+          cancelLookups++;
+          if (cancelLookups === 2) {
+            return Promise.resolve(null);
+          }
+        }
+        return originalImpl(query);
+      });
+      const cancelled = await cancelWarning(draft.warningId);
+      expect(cancelled).toBeDefined();
+
+      // Retry fallback
+      const storeIdx = mockWarningsStore.findIndex((w) => w.warningId === draft.warningId);
+      if (storeIdx >= 0) mockWarningsStore[storeIdx].status = "ACTIVE";
+
+      let retryLookups = 0;
+      (Warning.findOne as jest.Mock).mockImplementation((query: any) => {
+        if (query.warningId === draft.warningId) {
+          retryLookups++;
+          if (retryLookups === 3) {
+            return Promise.resolve(null);
+          }
+        }
+        return originalImpl(query);
+      });
+      const retried = await retryWarningDispatch(draft.warningId);
+      expect(retried).toBeDefined();
+
+      (Warning.findOne as jest.Mock).mockImplementation(originalImpl);
+    });
   });
 });
+

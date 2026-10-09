@@ -219,6 +219,105 @@ describe("UC1: Notification Service & Gateway Dispatch Unit Tests", () => {
       const notif = await dispatchNotification(dummyWarning, "BOTH");
       expect(notif).toBeDefined();
     });
+
+    test("2.6 E4 Fallback: when PUSH channel fails 3 retries, falls back to SMS channel and dispatches successfully", async () => {
+      let callCount = 0;
+      const gatewayWithPushFailure = {
+        send: jest.fn().mockImplementation(({ channel }) => {
+          callCount++;
+          if (channel === "PUSH") {
+            return Promise.resolve({ success: false, messageId: `PUSH_FAIL_${callCount}` });
+          }
+          // Fallback to SMS succeeds
+          return Promise.resolve({ success: true, messageId: "SMS_FALLBACK_OK" });
+        }),
+      };
+      setGatewayClient(gatewayWithPushFailure as any);
+
+      const notif = await dispatchNotification(dummyWarning, "PUSH");
+      expect(notif.channel).toBe("SMS");
+      expect(notif.status).toBe("SENT");
+      expect(notif.errorLog).toContain("[FALLBACK_E4]");
+    });
+
+    test("2.7 E5 Health Check: gateway isHealthy returning false throws GatewayUnavailableError and sets PENDING_DISPATCH", async () => {
+      const gatewayWithHealth = {
+        isHealthy: jest.fn().mockResolvedValue(false),
+        send: jest.fn(),
+      };
+      setGatewayClient(gatewayWithHealth as any);
+
+      const notif = await dispatchNotification(dummyWarning, "SMS");
+      expect(notif.status).toBe("PENDING_DISPATCH");
+      expect(notif.errorLog).toContain("Gateway health check failed");
+      expect(mockWarningsStore[0].dispatchStatus).toBe("PENDING_DISPATCH");
+    });
+
+    test("2.8 E5 Health Check: gateway isHealthy throwing unexpected error sets PENDING_DISPATCH", async () => {
+      const gatewayHealthThrow = {
+        isHealthy: jest.fn().mockRejectedValue(new Error("Network probe failed")),
+        send: jest.fn(),
+      };
+      setGatewayClient(gatewayHealthThrow as any);
+
+      const notif = await dispatchNotification(dummyWarning, "SMS");
+      expect(notif.status).toBe("PENDING_DISPATCH");
+      expect(notif.errorLog).toContain("Network probe failed");
+    });
+
+    test("2.9 E5 Health Check: gateway isHealthy returning true executes health check and sends normally", async () => {
+      const gatewayHealthy = {
+        isHealthy: jest.fn().mockResolvedValue(true),
+        send: jest.fn().mockResolvedValue({ success: true, messageId: "HEALTHY_GW_OK" }),
+      };
+      setGatewayClient(gatewayHealthy as any);
+
+      const notif = await dispatchNotification(dummyWarning, "SMS");
+      expect(notif.status).toBe("SENT");
+      expect(gatewayHealthy.isHealthy).toHaveBeenCalled();
+    });
+
+    test("2.10 E5 Health Check: gateway isHealthy throwing non-Error string maps error message via String(healthErr)", async () => {
+      const gatewayStringThrow = {
+        isHealthy: jest.fn().mockRejectedValue("Raw string gateway timeout"),
+        send: jest.fn(),
+      };
+      setGatewayClient(gatewayStringThrow as any);
+
+      const notif = await dispatchNotification(dummyWarning, "SMS");
+      expect(notif.status).toBe("PENDING_DISPATCH");
+      expect(notif.errorLog).toContain("Raw string gateway timeout");
+    });
+
+    test("2.11 E4 Push Retry Success: succeeds on second attempt without falling back to SMS", async () => {
+      let attempts = 0;
+      const gatewayPushSuccessOnRetry = {
+        send: jest.fn().mockImplementation(() => {
+          attempts++;
+          if (attempts === 1) {
+            return Promise.resolve({ success: false, messageId: "ATTEMPT_1_FAIL" });
+          }
+          return Promise.resolve({ success: true, messageId: "ATTEMPT_2_SUCCESS" });
+        }),
+      };
+      setGatewayClient(gatewayPushSuccessOnRetry as any);
+
+      const notif = await dispatchNotification(dummyWarning, "PUSH");
+      expect(notif.status).toBe("SENT");
+      expect(notif.channel).toBe("PUSH");
+      expect(notif.errorLog).toBeNull();
+    });
+
+    test("2.12 Non-Error Exception Handling: gateway throwing non-Error raw string during send maps to String(err)", async () => {
+      const gatewayThrowsString = {
+        send: jest.fn().mockRejectedValue("Fatal raw connection reset"),
+      };
+      setGatewayClient(gatewayThrowsString as any);
+
+      const notif = await dispatchNotification(dummyWarning, "BOTH");
+      expect(notif.status).toBe("FAILED");
+      expect(notif.errorLog).toContain("Fatal raw connection reset");
+    });
   });
 
 
