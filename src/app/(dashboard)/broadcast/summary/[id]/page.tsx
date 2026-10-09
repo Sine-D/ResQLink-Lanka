@@ -30,6 +30,47 @@ export default function DeliverySummaryDashboardPage({ params }: SummaryPageProp
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [retryMessage, setRetryMessage] = useState("");
+  const [alarmPlaying, setAlarmPlaying] = useState(false);
+
+  useEffect(() => {
+    // Check if emergency siren audio is playing or should be auto-played
+    if (typeof window !== "undefined") {
+      const audio = (window as any).__warningAlarmAudio;
+      if (audio && !audio.paused) {
+        setAlarmPlaying(true);
+      } else if (new URLSearchParams(window.location.search).get("alarm") === "true") {
+        try {
+          const newAudio = audio || new Audio("/warning_alarm.mp3");
+          newAudio.volume = 1.0;
+          newAudio.loop = true;
+          (window as any).__warningAlarmAudio = newAudio;
+          newAudio
+            .play()
+            .then(() => setAlarmPlaying(true))
+            .catch(() => {});
+        } catch {}
+      }
+    }
+  }, []);
+
+  const toggleAlarmAudio = () => {
+    if (typeof window !== "undefined") {
+      let audio = (window as any).__warningAlarmAudio;
+      if (!audio) {
+        audio = new Audio("/warning_alarm.mp3");
+        audio.volume = 1.0;
+        audio.loop = true;
+        (window as any).__warningAlarmAudio = audio;
+      }
+
+      if (alarmPlaying) {
+        audio.pause();
+        setAlarmPlaying(false);
+      } else {
+        audio.play().then(() => setAlarmPlaying(true)).catch(() => {});
+      }
+    }
+  };
 
   const fetchSummary = async () => {
     try {
@@ -162,6 +203,52 @@ export default function DeliverySummaryDashboardPage({ params }: SummaryPageProp
           </span>
         </div>
       )}
+
+      {/* Emergency Siren Audio Player Banner */}
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+              alarmPlaying
+                ? "bg-red-600/30 border border-red-500/60 text-red-400 animate-pulse"
+                : "bg-slate-800 border border-slate-700 text-slate-400"
+            }`}
+          >
+            <Radio className={`w-5 h-5 ${alarmPlaying ? "animate-spin" : ""}`} />
+          </div>
+          <div>
+            <div className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <span>Public Broadcast Siren Sound</span>
+              {alarmPlaying ? (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white font-mono animate-pulse">
+                  PLAYING
+                </span>
+              ) : (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+                  MUTED
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400">
+              {alarmPlaying
+                ? "Real emergency alarm is actively sounding through device speaker."
+                : "Siren audio is muted. Click button to test or replay emergency siren."}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={toggleAlarmAudio}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 ${
+            alarmPlaying
+              ? "bg-red-600 hover:bg-red-500 text-white shadow-red-600/30"
+              : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+          }`}
+        >
+          <span>{alarmPlaying ? "🔇 Silence Siren" : "🔊 Play Siren Audio"}</span>
+        </button>
+      </div>
 
       {/* Real-time Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

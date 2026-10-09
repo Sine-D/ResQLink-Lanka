@@ -127,7 +127,7 @@ export default function ReviewWarningPage() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xl font-bold text-white">{warning.hazardType} Warning</span>
-              <WarningStatusBadge status={warning.severity} type="warning" />
+              <WarningStatusBadge status={warning.severity} type="severity" />
             </div>
             <span className="text-xs text-slate-400 mt-1 block">ID: {warning.warningId}</span>
           </div>

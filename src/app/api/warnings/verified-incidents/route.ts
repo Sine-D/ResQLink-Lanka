@@ -3,58 +3,121 @@ import connectMongo from "@/lib/db/connectMongo";
 import HazardReport from "@/lib/models/HazardReport";
 import Incident from "@/lib/models/Incident";
 
-export async function GET() {
+const VALID_DISTRICTS = [
+  "Colombo", "Gampaha", "Kalutara", "Kandy", "Matale", "Nuwara Eliya",
+  "Galle", "Matara", "Hambantota", "Jaffna", "Kilinochchi", "Mannar",
+  "Vavuniya", "Mullaitivu", "Batticaloa", "Ampara", "Trincomalee",
+  "Kurunegala", "Puttalam", "Anuradhapura", "Polonnaruwa", "Badulla",
+  "Monaragala", "Ratnapura", "Kegalle",
+];
+
+function normalizeHazardType(raw: string): string {
+  const lower = (raw || "").toLowerCase();
+  if (lower.includes("flash") || lower.includes("flashflood")) return "FlashFlood";
+  if (lower.includes("flood") || lower.includes("water")) return "Flood";
+  if (lower.includes("landslide") || lower.includes("collapse")) return "Landslide";
+  if (lower.includes("cyclone") || lower.includes("wind") || lower.includes("storm")) return "Cyclone";
+  if (lower.includes("tsunami")) return "Tsunami";
+  if (lower.includes("drought")) return "Drought";
+  return "Flood"; // default fallback for weather/disaster
+}
+
+function resolveDistrict(loc: string, fallback: string = "Colombo"): string {
+  if (!loc) return fallback;
+  const lower = loc.toLowerCase();
+  for (const d of VALID_DISTRICTS) {
+    if (lower.includes(d.toLowerCase())) return d;
+  }
+  return fallback;
+}
+
+export async function GET(req: Request) {
   try {
     await connectMongo();
+    const { searchParams } = new URL(req.url);
+    const rawDistrict = searchParams.get("district");
+    const rawHazard = searchParams.get("hazardType");
 
-    // 1. Fetch Verified Hazard Reports from citizens
-    const verifiedReports = await HazardReport.find({
-      status: "VERIFIED",
-    })
+    const filterDistrict = rawDistrict && rawDistrict !== "ALL"
+      ? rawDistrict.replace(/[^a-zA-Z\s]/g, "").trim()
+      : null;
+    const filterHazard = rawHazard && rawHazard !== "ALL"
+      ? rawHazard.replace(/[^a-zA-Z\s]/g, "").trim()
+      : null;
+
+    // 1. Fetch Verified Citizen Reports
+    const hazardQuery: Record<string, any> = { status: "VERIFIED" };
+    if (filterDistrict) {
+      hazardQuery.locationName = { $regex: filterDistrict, $options: "i" };
+    }
+
+    const verifiedReports = await HazardReport.find(hazardQuery)
       .sort({ reviewedAt: -1, createdAt: -1 })
-      .limit(20)
+      .limit(30)
       .lean();
 
-    // 2. Fetch Open/Active incidents from operations
-    const activeIncidents = await Incident.find({
-      status: { $in: ["OPEN", "DISPATCHED"] },
-    })
+    // 2. Fetch Open/Active Operational Incidents
+    const incidentQuery: Record<string, any> = {
+      status: { $in: ["OPEN", "DISPATCHED", "RESOLVED"] },
+    };
+    if (filterDistrict) {
+      incidentQuery.district = { $regex: `^${filterDistrict}$`, $options: "i" };
+    }
+
+    const activeIncidents = await Incident.find(incidentQuery)
       .sort({ createdAt: -1 })
-      .limit(20)
+      .limit(30)
       .lean();
 
-    const formattedIncidents = [
-      ...verifiedReports.map((r: any) => ({
-        id: r.reportId || r._id.toString(),
-        type: "HAZARD_REPORT",
-        title: `${r.hazardType} in ${r.locationName || "Area"} (Verified Report)`,
-        hazardType: r.hazardType,
-        district: r.locationName?.split(",")[0]?.trim() || "Colombo",
-        severity: "High",
-        description: r.description || "",
-        instructions: `Precautionary safety instructions: Stay clear of ${r.hazardType} hazard zones around ${r.locationName || "the affected area"}. Follow DMC evacuation advisories.`,
-        date: r.reviewedAt || r.createdAt,
-      })),
-      ...activeIncidents.map((inc: any) => ({
+    const formattedIncidents: any[] = [];
+
+    // Format Operational Incidents
+    for (const inc of activeIncidents as any[]) {
+      const hazard = normalizeHazardType(inc.title + " " + inc.description);
+      if (filterHazard && filterHazard !== "ALL" && hazard !== filterHazard) continue;
+
+      const district = resolveDistrict(inc.district, inc.district || "Colombo");
+      formattedIncidents.push({
         id: inc.incidentId || inc._id.toString(),
+        code: inc.incidentId || "INC",
         type: "OPERATIONAL_INCIDENT",
-        title: `${inc.title} - ${inc.district} (${inc.severity} Severity)`,
-        hazardType: inc.title.toLowerCase().includes("flood")
-          ? "Flood"
-          : inc.title.toLowerCase().includes("landslide")
-          ? "Landslide"
-          : inc.title.toLowerCase().includes("cyclone")
-          ? "Cyclone"
-          : "FlashFlood",
-        district: inc.district || "Colombo",
+        title: inc.title || "Emergency Incident",
+        displayLabel: `[${inc.incidentId || "INC"}] ${inc.title} • ${district} (${inc.severity} Severity)`,
+        hazardType: hazard,
+        district,
         severity: inc.severity || "High",
         description: inc.description || "",
-        instructions: `Emergency response advisory for ${inc.district}: ${inc.description}. Please move to safe shelters.`,
+        instructions: `Emergency response directive for ${district}: ${inc.description || "Move to safe shelters immediately."} Follow DMC official instructions.`,
         date: inc.createdAt,
-      })),
-    ];
+      });
+    }
 
-    return NextResponse.json({ incidents: formattedIncidents });
+    // Format Verified Citizen Hazard Reports
+    for (const r of verifiedReports as any[]) {
+      const hazard = normalizeHazardType(r.hazardType + " " + r.description);
+      if (filterHazard && filterHazard !== "ALL" && hazard !== filterHazard) continue;
+
+      const district = resolveDistrict(r.locationName, "Colombo");
+      formattedIncidents.push({
+        id: r.reportId || r._id.toString(),
+        code: (r.reportId || "REP").slice(0, 8),
+        type: "HAZARD_REPORT",
+        title: `${r.hazardType} in ${r.locationName || district}`,
+        displayLabel: `[VERIFIED] ${r.hazardType} at ${r.locationName || district} • ${district}`,
+        hazardType: hazard,
+        district,
+        severity: "High",
+        description: r.description || "",
+        instructions: `Precautionary safety directives: Evacuate danger zones near ${r.locationName || district}. Monitor DMC emergency broadcast alerts.`,
+        date: r.reviewedAt || r.createdAt,
+      });
+    }
+
+    return NextResponse.json({
+      incidents: formattedIncidents,
+      totalCount: formattedIncidents.length,
+      filterDistrict: filterDistrict || null,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to fetch verified incidents";
     return NextResponse.json({ error: message }, { status: 500 });

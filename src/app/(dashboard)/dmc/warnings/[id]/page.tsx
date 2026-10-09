@@ -85,7 +85,6 @@ export default function WarningDetailPage() {
               <Radio className="w-6 h-6 text-red-500" />
               {warning.hazardType} Warning
             </h1>
-            <p className="text-xs text-slate-400 mt-1 font-mono">UUID: {warning.warningId}</p>
           </div>
 
           <div className="flex items-center gap-2">

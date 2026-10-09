@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import MapAreaPicker from "@/components/warnings/MapAreaPicker";
+import MapAreaPicker, { DISTRICT_BOUNDS } from "@/components/warnings/MapAreaPicker";
 import {
   ShieldAlert,
   AlertCircle,
@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   FileCheck2,
   AlertTriangle,
+  Filter,
 } from "lucide-react";
 import { estimateDistrictReach } from "@/lib/utils/reachEstimator";
 
@@ -32,8 +33,10 @@ const SEVERITIES = ["Low", "Medium", "High", "Critical"];
 
 interface VerifiedIncident {
   id: string;
+  code?: string;
   type: string;
   title: string;
+  displayLabel?: string;
   hazardType: string;
   district: string;
   severity: string;
@@ -62,6 +65,7 @@ function CreateBroadcastForm() {
   const [verifiedIncidents, setVerifiedIncidents] = useState<VerifiedIncident[]>([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState("");
   const [loadingIncidents, setLoadingIncidents] = useState(false);
+  const [filterByDistrict, setFilterByDistrict] = useState(true);
 
   const [error, setError] = useState("");
   const [overlapWarning, setOverlapWarning] = useState<any>(null);
@@ -95,17 +99,27 @@ function CreateBroadcastForm() {
     }
   }, [editDraftId]);
 
-  // Fetch verified incidents for optional autofill
+  // Fetch verified incidents filtered from database by district if enabled
   useEffect(() => {
+    let isMounted = true;
     setLoadingIncidents(true);
-    fetch("/api/warnings/verified-incidents")
+    const query = filterByDistrict && districtName ? `?district=${encodeURIComponent(districtName)}` : "";
+    fetch(`/api/warnings/verified-incidents${query}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.incidents) setVerifiedIncidents(data.incidents);
+        if (isMounted && data.incidents) {
+          setVerifiedIncidents(data.incidents);
+        }
       })
       .catch((err) => console.error("Error fetching verified incidents", err))
-      .finally(() => setLoadingIncidents(false));
-  }, []);
+      .finally(() => {
+        if (isMounted) setLoadingIncidents(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [districtName, filterByDistrict]);
 
   // Check duplicate active warnings for this district and hazard (E3)
   useEffect(() => {
@@ -124,7 +138,7 @@ function CreateBroadcastForm() {
     }
   }, [districtName, hazardType, editDraftId]);
 
-  // Autofill when a verified incident is selected
+  // Autofill when a verified incident is selected from database
   const handleSelectIncident = (incidentId: string) => {
     setSelectedIncidentId(incidentId);
     if (!incidentId) return;
@@ -136,6 +150,9 @@ function CreateBroadcastForm() {
       }
       if (inc.district) {
         setDistrictName(inc.district);
+        if (DISTRICT_BOUNDS[inc.district]?.poly) {
+          setCoordinates(DISTRICT_BOUNDS[inc.district].poly);
+        }
       }
       if (inc.severity && SEVERITIES.includes(inc.severity)) {
         setSeverity(inc.severity);
@@ -143,8 +160,8 @@ function CreateBroadcastForm() {
       if (inc.instructions) {
         setInstructions(inc.instructions);
       }
-      setSuccessToast(`Autofilled data from verified incident: "${inc.title}"`);
-      setTimeout(() => setSuccessToast(""), 4000);
+      setSuccessToast(`Autofilled criteria from database incident: [${inc.code || inc.id}] ${inc.title} (${inc.district})`);
+      setTimeout(() => setSuccessToast(""), 4500);
     }
   };
 
@@ -298,50 +315,97 @@ function CreateBroadcastForm() {
         </div>
       )}
 
-      {/* Duplicate Active Warning Notice (E3) */}
-      {overlapWarning && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-1">
-          <div className="flex items-center gap-2 font-bold text-amber-400 text-sm">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Duplicate Active Warning Detected (E3)</span>
-          </div>
-          <p>
-            An active <strong>{overlapWarning.hazardType}</strong> warning is already broadcasting in{" "}
-            <strong>{overlapWarning.district}</strong> (Valid until:{" "}
-            {new Date(overlapWarning.validUntil).toLocaleString()}). Proceeding will create an overlapping alert.
-          </p>
-        </div>
-      )}
-
       {/* Optional: Based on Verified Incident Dropdown */}
-      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Based on Verified Incident (Optional Autofill)</span>
+      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span>Based on Verified Incident</span>
           </label>
-          <span className="text-[10px] text-slate-400">
-            {loadingIncidents ? "Loading verified incidents..." : `${verifiedIncidents.length} verified incident(s) available`}
+
+          {/* District Filter Toggles */}
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setFilterByDistrict(true)}
+              className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                filterByDistrict
+                  ? "bg-red-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              📍 Filter by {districtName}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterByDistrict(false)}
+              className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                !filterByDistrict
+                  ? "bg-red-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              🌐 All Districts
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+          <span>
+            <strong className="text-white font-mono">{verifiedIncidents.length}</strong> verified incident(s) available in{" "}
+            <strong className="text-red-400">{filterByDistrict ? districtName : "All Districts"}</strong>
           </span>
+
+          {filterByDistrict && verifiedIncidents.length === 0 && !loadingIncidents && (
+            <button
+              type="button"
+              onClick={() => setFilterByDistrict(false)}
+              className="text-red-400 hover:text-red-300 underline font-medium text-[11px]"
+            >
+              Switch to All Districts to view available reports
+            </button>
+          )}
         </div>
 
         <select
           value={selectedIncidentId}
           onChange={(e) => handleSelectIncident(e.target.value)}
-          className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-red-500"
+          style={{ backgroundColor: "#020617", color: "#f8fafc" }}
+          className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-red-500 font-medium shadow-inner"
         >
-          <option value="">-- Select a verified report or incident to autofill --</option>
+          <option value="" style={{ backgroundColor: "#020617", color: "#94a3b8" }}>
+            {verifiedIncidents.length === 0
+              ? `-- No verified incidents in ${districtName} --`
+              : `-- Select a verified incident to autofill --`}
+          </option>
           {verifiedIncidents.map((inc) => (
-            <option key={inc.id} value={inc.id}>
-              {inc.title} - [{inc.district}] ({new Date(inc.date).toLocaleDateString()})
+            <option
+              key={inc.id}
+              value={inc.id}
+              style={{ backgroundColor: "#020617", color: "#f8fafc" }}
+            >
+              {inc.displayLabel || `[${inc.code || inc.id}] ${inc.title} • ${inc.district} (${inc.severity} Severity)`}
             </option>
           ))}
         </select>
+
         {selectedIncidentId && (
-          <p className="text-[11px] text-emerald-400 flex items-center gap-1">
-            <FileCheck2 className="w-3.5 h-3.5" />
-            Linked source incident ID: <span className="font-mono">{selectedIncidentId}</span>
-          </p>
+          <div className="p-3 rounded-xl bg-slate-950 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+              <FileCheck2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Linked Source Incident:</span>
+              <span className="font-mono text-white bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                {selectedIncidentId}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedIncidentId("")}
+              className="text-[11px] text-slate-400 hover:text-red-400 underline transition-colors"
+            >
+              Clear Link
+            </button>
+          </div>
         )}
       </div>
 
@@ -360,10 +424,11 @@ function CreateBroadcastForm() {
               <select
                 value={hazardType}
                 onChange={(e) => setHazardType(e.target.value)}
+                style={{ backgroundColor: "#020617", color: "#f8fafc" }}
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-red-500 font-semibold"
               >
                 {HAZARD_TYPES.map((h) => (
-                  <option key={h} value={h}>
+                  <option key={h} value={h} style={{ backgroundColor: "#020617", color: "#f8fafc" }}>
                     {h}
                   </option>
                 ))}
@@ -378,6 +443,15 @@ function CreateBroadcastForm() {
               <select
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value)}
+                style={{
+                  backgroundColor: "#020617",
+                  color:
+                    severity === "High" || severity === "Critical"
+                      ? "#f87171"
+                      : severity === "Medium"
+                      ? "#fbbf24"
+                      : "#f8fafc",
+                }}
                 className={`w-full px-4 py-2.5 rounded-xl bg-slate-950 border text-xs focus:outline-none font-bold ${
                   severity === "High" || severity === "Critical"
                     ? "border-red-500 text-red-400"
@@ -387,7 +461,19 @@ function CreateBroadcastForm() {
                 }`}
               >
                 {SEVERITIES.map((s) => (
-                  <option key={s} value={s}>
+                  <option
+                    key={s}
+                    value={s}
+                    style={{
+                      backgroundColor: "#020617",
+                      color:
+                        s === "High" || s === "Critical"
+                          ? "#f87171"
+                          : s === "Medium"
+                          ? "#fbbf24"
+                          : "#f8fafc",
+                    }}
+                  >
                     {s} Severity {s === "High" || s === "Critical" ? "(Confirmation Modal Required)" : ""}
                   </option>
                 ))}
@@ -407,6 +493,7 @@ function CreateBroadcastForm() {
                 value={validFrom}
                 onChange={(e) => setValidFrom(e.target.value)}
                 required
+                style={{ backgroundColor: "#020617", color: "#f8fafc", colorScheme: "dark" }}
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-red-500"
               />
             </div>
@@ -421,6 +508,7 @@ function CreateBroadcastForm() {
                 value={validUntil}
                 onChange={(e) => setValidUntil(e.target.value)}
                 required
+                style={{ backgroundColor: "#020617", color: "#f8fafc", colorScheme: "dark" }}
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-red-500"
               />
             </div>
@@ -438,6 +526,7 @@ function CreateBroadcastForm() {
               required
               minLength={10}
               placeholder="Provide clear, concise citizen safety and evacuation directives..."
+              style={{ backgroundColor: "#020617", color: "#f8fafc" }}
               className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-red-500 leading-relaxed"
             />
             <div className="text-[10px] text-slate-500 text-right mt-1">

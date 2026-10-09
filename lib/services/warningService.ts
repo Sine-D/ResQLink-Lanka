@@ -462,3 +462,29 @@ export async function checkAndExpireAllActiveWarnings(): Promise<number> {
   );
   return result.modifiedCount || 0;
 }
+
+/**
+ * Hard Deletes an unissued disaster warning draft from the database.
+ * Only warnings in 'DRAFT' status can be permanently discarded/deleted.
+ *
+ * @param warningId - Unique business identifier of the warning draft.
+ * @returns Promise resolving to boolean indicating successful deletion.
+ * @throws {WarningNotFoundError} If warning record is not found.
+ * @throws {InvalidWarningStateError} If warning is not in DRAFT status.
+ */
+export async function deleteDraft(warningId: string): Promise<boolean> {
+  const warning = await Warning.findOne({ warningId });
+  if (!warning) {
+    throw new WarningNotFoundError(`Disaster Warning with ID ${warningId} does not exist`);
+  }
+
+  if (warning.status !== "DRAFT") {
+    throw new InvalidWarningStateError(
+      `Cannot discard a warning that is currently '${warning.status}'. Only DRAFT warnings can be permanently discarded.`
+    );
+  }
+
+  await NotificationModel.deleteMany({ warningId: warning._id });
+  const result = await Warning.deleteOne({ warningId });
+  return result.deletedCount === 1;
+}

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import connectMongo from "@/lib/db/connectMongo";
-import { getWarningById, updateDraft, InvalidTargetAreaError } from "@/lib/services/warningService";
+import {
+  getWarningById,
+  updateDraft,
+  deleteDraft,
+  InvalidTargetAreaError,
+  WarningNotFoundError,
+  InvalidWarningStateError,
+} from "@/lib/services/warningService";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { ZodError } from "zod";
@@ -71,6 +78,47 @@ export async function PUT(
       );
     }
     const message = err instanceof Error ? err.message : "Failed to update draft";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userRole = (session.user as { role?: string }).role;
+    if (userRole !== "DMC_OFFICER") {
+      return NextResponse.json(
+        { error: "Forbidden: Only DMC Officers can discard warning drafts" },
+        { status: 403 }
+      );
+    }
+
+    const { id } = await params;
+    await connectMongo();
+    await deleteDraft(id);
+
+    return NextResponse.json(
+      { success: true, message: "Draft warning permanently discarded" },
+      { status: 200 }
+    );
+  } catch (err: unknown) {
+    if (err instanceof WarningNotFoundError) {
+      return NextResponse.json({ error: err.message }, { status: 404 });
+    }
+    if (err instanceof InvalidWarningStateError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    const message = err instanceof Error ? err.message : "Failed to discard draft";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
