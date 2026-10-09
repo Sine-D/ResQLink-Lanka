@@ -48,12 +48,15 @@ export async function GET(req: Request) {
     // 1. Fetch Verified Citizen Reports
     const hazardQuery: Record<string, any> = { status: "VERIFIED" };
     if (filterDistrict) {
-      hazardQuery.locationName = { $regex: filterDistrict, $options: "i" };
+      hazardQuery.$or = [
+        { locationName: { $regex: filterDistrict, $options: "i" } },
+        { description: { $regex: filterDistrict, $options: "i" } },
+      ];
     }
 
     const verifiedReports = await HazardReport.find(hazardQuery)
       .sort({ reviewedAt: -1, createdAt: -1 })
-      .limit(30)
+      .limit(50)
       .lean();
 
     // 2. Fetch Open/Active Operational Incidents
@@ -61,12 +64,16 @@ export async function GET(req: Request) {
       status: { $in: ["OPEN", "DISPATCHED", "RESOLVED"] },
     };
     if (filterDistrict) {
-      incidentQuery.district = { $regex: `^${filterDistrict}$`, $options: "i" };
+      incidentQuery.$or = [
+        { district: { $regex: filterDistrict, $options: "i" } },
+        { locationName: { $regex: filterDistrict, $options: "i" } },
+        { title: { $regex: filterDistrict, $options: "i" } },
+      ];
     }
 
     const activeIncidents = await Incident.find(incidentQuery)
       .sort({ createdAt: -1 })
-      .limit(30)
+      .limit(50)
       .lean();
 
     const formattedIncidents: any[] = [];
