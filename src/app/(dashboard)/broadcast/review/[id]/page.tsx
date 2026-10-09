@@ -167,21 +167,6 @@ export default function BroadcastReviewDetailPage({ params }: ReviewPageProps) {
         </div>
       )}
 
-      {/* Duplicate Active Warning Alert (E3) */}
-      {overlapData && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2">
-          <div className="flex items-center gap-2 font-bold text-amber-400 text-sm">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Duplicate Active Warning Notice (E3)</span>
-          </div>
-          <p>
-            An active <strong>{overlapData.hazardType}</strong> warning is already broadcasting in{" "}
-            <strong>{overlapData.district}</strong> until {new Date(overlapData.validUntil).toLocaleString()}.
-            Authorizing this broadcast will trigger concurrent alerts in the same district.
-          </p>
-        </div>
-      )}
-
       {/* Warning Summary Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
