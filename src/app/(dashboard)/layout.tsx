@@ -76,9 +76,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
 
                 <Link
-                  href="/dmc/warnings/new"
+                  href="/broadcast/create"
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                    pathname === "/dmc/warnings/new"
+                    pathname === "/broadcast/create" || pathname.startsWith("/broadcast") || pathname === "/dmc/warnings/new"
                       ? "bg-red-600 text-white shadow-md shadow-red-600/30"
                       : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
                   }`}
