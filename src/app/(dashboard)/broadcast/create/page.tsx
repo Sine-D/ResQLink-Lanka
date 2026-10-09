@@ -352,16 +352,8 @@ function CreateBroadcastForm() {
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
           <span>
-            {loadingIncidents ? (
-              <span className="text-amber-400 font-medium animate-pulse">
-                Filtering database incidents from MongoDB...
-              </span>
-            ) : (
-              <span>
-                <strong className="text-white font-mono">{verifiedIncidents.length}</strong> verified incident(s) found in{" "}
-                <strong className="text-red-400">{filterByDistrict ? districtName : "All Districts"}</strong>
-              </span>
-            )}
+            <strong className="text-white font-mono">{verifiedIncidents.length}</strong> verified incident(s) available in{" "}
+            <strong className="text-red-400">{filterByDistrict ? districtName : "All Districts"}</strong>
           </span>
 
           {filterByDistrict && verifiedIncidents.length === 0 && !loadingIncidents && (
@@ -382,11 +374,9 @@ function CreateBroadcastForm() {
           className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-red-500 font-medium shadow-inner"
         >
           <option value="" style={{ backgroundColor: "#020617", color: "#94a3b8" }}>
-            {loadingIncidents
-              ? "-- Loading incidents from database... --"
-              : verifiedIncidents.length === 0
-              ? `-- No verified incidents in ${districtName} (Click "All Districts" above) --`
-              : `-- Select a verified incident to autofill (${filterByDistrict ? districtName : "All Districts"}) --`}
+            {verifiedIncidents.length === 0
+              ? `-- No verified incidents in ${districtName} --`
+              : `-- Select a verified incident to autofill --`}
           </option>
           {verifiedIncidents.map((inc) => (
             <option
@@ -453,7 +443,15 @@ function CreateBroadcastForm() {
               <select
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value)}
-                style={{ backgroundColor: "#020617" }}
+                style={{
+                  backgroundColor: "#020617",
+                  color:
+                    severity === "High" || severity === "Critical"
+                      ? "#f87171"
+                      : severity === "Medium"
+                      ? "#fbbf24"
+                      : "#f8fafc",
+                }}
                 className={`w-full px-4 py-2.5 rounded-xl bg-slate-950 border text-xs focus:outline-none font-bold ${
                   severity === "High" || severity === "Critical"
                     ? "border-red-500 text-red-400"
@@ -463,7 +461,19 @@ function CreateBroadcastForm() {
                 }`}
               >
                 {SEVERITIES.map((s) => (
-                  <option key={s} value={s} style={{ backgroundColor: "#020617", color: "#f8fafc" }}>
+                  <option
+                    key={s}
+                    value={s}
+                    style={{
+                      backgroundColor: "#020617",
+                      color:
+                        s === "High" || s === "Critical"
+                          ? "#f87171"
+                          : s === "Medium"
+                          ? "#fbbf24"
+                          : "#f8fafc",
+                    }}
+                  >
                     {s} Severity {s === "High" || s === "Critical" ? "(Confirmation Modal Required)" : ""}
                   </option>
                 ))}
