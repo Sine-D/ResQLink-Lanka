@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -49,8 +50,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <div className="space-y-6">
           <Link href="/" className="flex items-center gap-2.5 px-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center text-white shadow-md shadow-red-600/30">
-              <ShieldAlert className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 flex items-center justify-center shadow-md shadow-red-600/30">
+              <Image src="/logo.jpg" alt="Logo" width={36} height={36} className="w-full h-full object-cover" priority />
             </div>
             <div>
               <span className="text-base font-black text-white tracking-tight">ResQLink</span>

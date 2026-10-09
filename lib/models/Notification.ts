@@ -1,11 +1,25 @@
+/**
+ * @file Notification.ts
+ * @description Mongoose Data Model and Schema definition for UC1: Notifications.
+ * Records all emergency alert dispatches sent via SMS, Push, or Web channels,
+ * tracking broadcast timestamps, delivery attempts, and gateway error logs.
+ *
+ * @architecture Clean Architecture / Entity Layer
+ * @solid
+ * - Single Responsibility Principle (SRP): Defines the persistence contract for Alert Notifications.
+ */
+
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type NotificationChannel = "PUSH" | "SMS" | "BOTH";
 export type NotificationStatus = "SENT" | "FAILED" | "PENDING_DISPATCH";
 
+/**
+ * TypeScript interface representing an alert Notification document.
+ */
 export interface INotification extends Document {
   _id: mongoose.Types.ObjectId;
-  notificationId: string;
+  notificationId: string; // Business UUID v4
   warningId: mongoose.Types.ObjectId;
   channel: NotificationChannel;
   message: string;
@@ -33,6 +47,7 @@ const NotificationSchema = new Schema<INotification>(
       enum: ["SENT", "FAILED", "PENDING_DISPATCH"],
       default: "PENDING_DISPATCH",
       required: true,
+      index: true,
     },
     sentAt: { type: Date, default: null },
     retryCount: { type: Number, default: 0 },

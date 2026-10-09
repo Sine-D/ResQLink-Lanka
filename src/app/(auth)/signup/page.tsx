@@ -2,8 +2,9 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
-import { ShieldAlert, UserPlus, AlertCircle } from "lucide-react";
+import { UserPlus, AlertCircle } from "lucide-react";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -44,8 +45,8 @@ export default function SignUpPage() {
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center px-4 py-12">
       <div className="w-full max-w-md space-y-6 bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-red-600/20">
-            <ShieldAlert className="w-7 h-7" />
+          <div className="w-14 h-14 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center mx-auto shadow-lg shadow-red-600/20">
+            <Image src="/logo.jpg" alt="Logo" width={56} height={56} className="w-full h-full object-cover" priority />
           </div>
           <h2 className="text-2xl font-black text-white">Create Account</h2>
           <p className="text-xs text-slate-400">Select role and register for ResQLink Lanka</p>

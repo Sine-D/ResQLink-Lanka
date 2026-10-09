@@ -3,8 +3,9 @@
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
-import { ShieldAlert, LogIn, AlertCircle } from "lucide-react";
+import { LogIn, AlertCircle } from "lucide-react";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -42,8 +43,8 @@ export default function SignInPage() {
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center px-4 py-12">
       <div className="w-full max-w-md space-y-8 bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-red-600/20">
-            <ShieldAlert className="w-7 h-7" />
+          <div className="w-14 h-14 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center mx-auto shadow-lg shadow-red-600/20">
+            <Image src="/logo.jpg" alt="Logo" width={56} height={56} className="w-full h-full object-cover" priority />
           </div>
           <h2 className="text-2xl font-black text-white">Sign In to ResQLink</h2>
           <p className="text-xs text-slate-400">Access emergency warning and coordination tools</p>
@@ -91,11 +92,8 @@ export default function SignInPage() {
           </button>
         </form>
 
-        <div className="text-center pt-2 text-xs text-slate-400">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-red-400 font-bold hover:underline">
-            Register Account
-          </Link>
+        <div className="text-center pt-2 text-xs text-slate-500">
+          Authorized personnel access only &bull; Disaster Management Center
         </div>
       </div>
     </div>

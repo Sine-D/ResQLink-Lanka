@@ -4,14 +4,17 @@ import {
   dispatchNotification,
   retryNotificationDispatch,
   setGatewayClient,
+  getGatewayClient,
   MockEmergencyGatewayClient,
+  GatewayUnavailableError,
+  GatewayCriticalError,
 } from "../../lib/services/notificationService";
 
 // Mock Mongoose models for offline-resilient unit testing
 jest.mock("../../lib/models/Notification");
 jest.mock("../../lib/models/Warning");
 
-describe("Notification Service Unit Tests", () => {
+describe("UC1: Notification Service & Gateway Dispatch Unit Tests", () => {
   let mockNotificationsStore: any[] = [];
   let mockWarningsStore: any[] = [];
 
@@ -59,7 +62,9 @@ describe("Notification Service Unit Tests", () => {
       const instance = {
         ...data,
         save: jest.fn().mockImplementation(function (this: any) {
-          const index = mockNotificationsStore.findIndex((n) => n.notificationId === this.notificationId);
+          const index = mockNotificationsStore.findIndex(
+            (n) => n.notificationId === this.notificationId
+          );
           if (index >= 0) {
             mockNotificationsStore[index] = { ...this };
           } else {
@@ -73,7 +78,9 @@ describe("Notification Service Unit Tests", () => {
 
     // Setup Warning model mocks
     (Warning.findOne as jest.Mock).mockImplementation((query: any) => {
-      const found = mockWarningsStore.find((w) => w.warningId === query.warningId || w._id === query._id);
+      const found = mockWarningsStore.find(
+        (w) => w.warningId === query.warningId || w._id === query._id
+      );
       return Promise.resolve(found ? { ...found } : null);
     });
 
@@ -91,84 +98,174 @@ describe("Notification Service Unit Tests", () => {
     });
   });
 
-  test("dispatchNotification() success path creates SENT notification and sets warning.dispatchStatus = SENT", async () => {
-    const mockGateway = new MockEmergencyGatewayClient();
-    mockGateway.setMode("SUCCESS");
-    setGatewayClient(mockGateway);
 
-    const notif = await dispatchNotification(dummyWarning, "BOTH");
+  // 1. POSITIVE TEST CASES
 
-    expect(notif).toBeDefined();
-    expect(notif.status).toBe("SENT");
-    expect(notif.sentAt).toBeInstanceOf(Date);
-    expect(notif.errorLog).toBeNull();
-    expect(mockWarningsStore[0].dispatchStatus).toBe("SENT");
-  });
+  describe("1. Positive (Happy Path) Test Cases", () => {
+    test("1.1 dispatchNotification() success path creates SENT notification and updates warning to SENT", async () => {
+      const mockGateway = new MockEmergencyGatewayClient();
+      mockGateway.setMode("SUCCESS");
+      setGatewayClient(mockGateway);
 
-  test("dispatchNotification() when gateway throws GatewayUnavailableError -> sets PENDING_DISPATCH", async () => {
-    const mockGateway = new MockEmergencyGatewayClient();
-    mockGateway.setMode("UNAVAILABLE");
-    setGatewayClient(mockGateway);
+      const notif = await dispatchNotification(dummyWarning, "BOTH");
 
-    const notif = await dispatchNotification(dummyWarning, "SMS");
-
-    expect(notif.status).toBe("PENDING_DISPATCH");
-    expect(notif.errorLog).toContain("[UNAVAILABLE]");
-    expect(mockWarningsStore[0].dispatchStatus).toBe("PENDING_DISPATCH");
-  });
-
-  test("dispatchNotification() when gateway throws GatewayCriticalError -> sets FAILED and populates errorLog", async () => {
-    const mockGateway = new MockEmergencyGatewayClient();
-    mockGateway.setMode("CRITICAL_ERROR");
-    setGatewayClient(mockGateway);
-
-    const notif = await dispatchNotification(dummyWarning, "PUSH");
-
-    expect(notif.status).toBe("FAILED");
-    expect(notif.errorLog).toContain("[CRITICAL_FAILURE]");
-    expect(mockWarningsStore[0].dispatchStatus).toBe("FAILED");
-  });
-
-  test("retryNotificationDispatch() re-attempts pending/failed dispatch and succeeds", async () => {
-    const mockGateway = new MockEmergencyGatewayClient();
-    mockGateway.setMode("UNAVAILABLE");
-    setGatewayClient(mockGateway);
-
-    await dispatchNotification(dummyWarning);
-    expect(mockWarningsStore[0].dispatchStatus).toBe("PENDING_DISPATCH");
-
-    // Switch gateway to SUCCESS and retry
-    mockGateway.setMode("SUCCESS");
-    const retriedNotif = await retryNotificationDispatch(dummyWarning.warningId);
-
-    expect(retriedNotif?.status).toBe("SENT");
-    expect(mockWarningsStore[0].dispatchStatus).toBe("SENT");
-  });
-
-  test("retryNotificationDispatch() on an already-SENT warning is idempotent (no-op)", async () => {
-    const mockGateway = new MockEmergencyGatewayClient();
-    mockGateway.setMode("SUCCESS");
-    setGatewayClient(mockGateway);
-
-    mockWarningsStore[0].dispatchStatus = "SENT";
-    mockNotificationsStore.push({
-      notificationId: "notif-1",
-      warningId: dummyWarning._id,
-      status: "SENT",
-      sentAt: new Date(),
+      expect(notif).toBeDefined();
+      expect(notif.status).toBe("SENT");
+      expect(notif.channel).toBe("BOTH");
+      expect(notif.sentAt).toBeInstanceOf(Date);
+      expect(notif.errorLog).toBeNull();
+      expect(notif.retryCount).toBe(0);
+      expect(mockWarningsStore[0].dispatchStatus).toBe("SENT");
     });
 
-    const spySend = jest.spyOn(mockGateway, "send");
-    const retriedNotif = await retryNotificationDispatch(dummyWarning.warningId);
+    test("1.2 Supports individual channels SMS and PUSH correctly", async () => {
+      const mockGateway = new MockEmergencyGatewayClient();
+      mockGateway.setMode("SUCCESS");
+      setGatewayClient(mockGateway);
 
-    expect(retriedNotif?.status).toBe("SENT");
-    expect(spySend).not.toHaveBeenCalled();
-    spySend.mockRestore();
+      // SMS channel
+      const smsNotif = await dispatchNotification(dummyWarning, "SMS");
+      expect(smsNotif.channel).toBe("SMS");
+      expect(smsNotif.status).toBe("SENT");
+
+      // PUSH channel
+      mockNotificationsStore = [];
+      const pushNotif = await dispatchNotification(dummyWarning, "PUSH");
+      expect(pushNotif.channel).toBe("PUSH");
+      expect(pushNotif.status).toBe("SENT");
+    });
+
+    test("1.3 getGatewayClient() returns the currently configured gateway client instance", () => {
+      const customGateway = new MockEmergencyGatewayClient();
+      setGatewayClient(customGateway);
+
+      const client = getGatewayClient();
+      expect(client).toBe(customGateway);
+    });
+
+    test("1.4 MockEmergencyGatewayClient successfully creates dynamic message IDs with valid format", async () => {
+      const gateway = new MockEmergencyGatewayClient();
+      const res = await gateway.send({
+        district: "Colombo",
+        channel: "BOTH",
+        message: "Test Emergency Message",
+        targetReach: 750000,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.messageId).toMatch(/^GW-MSG-\d+-\d+$/);
+    });
   });
 
-  test("retryNotificationDispatch() throws error for non-existent warning ID", async () => {
-    await expect(retryNotificationDispatch("non-existent-warning-id")).rejects.toThrow(
-      "Warning with ID non-existent-warning-id not found"
-    );
+
+  // 2. NEGATIVE & ERROR HANDLING TEST CASES
+
+  describe("2. Negative & Error Handling Test Cases", () => {
+    test("2.1 dispatchNotification() when gateway throws GatewayUnavailableError -> sets PENDING_DISPATCH", async () => {
+      const mockGateway = new MockEmergencyGatewayClient();
+      mockGateway.setMode("UNAVAILABLE");
+      setGatewayClient(mockGateway);
+
+      const notif = await dispatchNotification(dummyWarning, "SMS");
+
+      expect(notif.status).toBe("PENDING_DISPATCH");
+      expect(notif.errorLog).toContain("[UNAVAILABLE]");
+      expect(notif.retryCount).toBe(1);
+      expect(mockWarningsStore[0].dispatchStatus).toBe("PENDING_DISPATCH");
+    });
+
+    test("2.2 dispatchNotification() when gateway throws GatewayCriticalError -> sets FAILED and logs error", async () => {
+      const mockGateway = new MockEmergencyGatewayClient();
+      mockGateway.setMode("CRITICAL_ERROR");
+      setGatewayClient(mockGateway);
+
+      const notif = await dispatchNotification(dummyWarning, "PUSH");
+
+      expect(notif.status).toBe("FAILED");
+      expect(notif.errorLog).toContain("[CRITICAL_FAILURE]");
+      expect(notif.retryCount).toBe(1);
+      expect(mockWarningsStore[0].dispatchStatus).toBe("FAILED");
+    });
+
+    test("2.3 dispatchNotification() handles unexpected non-gateway generic errors safely", async () => {
+      const brokenGateway = {
+        send: jest.fn().mockRejectedValue(new Error("Unexpected DNS resolution timeout")),
+      };
+      setGatewayClient(brokenGateway as any);
+
+      const notif = await dispatchNotification(dummyWarning, "BOTH");
+
+      expect(notif.status).toBe("FAILED");
+      expect(notif.errorLog).toContain("[CRITICAL_FAILURE] Unexpected DNS resolution timeout");
+      expect(mockWarningsStore[0].dispatchStatus).toBe("FAILED");
+    });
+
+    test("2.4 Custom gateway error classes have correct names and default messages", () => {
+      const unavailable = new GatewayUnavailableError();
+      expect(unavailable.name).toBe("GatewayUnavailableError");
+      expect(unavailable.message).toBe("Notification Gateway currently unavailable");
+
+      const critical = new GatewayCriticalError();
+      expect(critical.name).toBe("GatewayCriticalError");
+      expect(critical.message).toBe("Critical transmission failure");
+    });
+
+    test("2.5 dispatchNotification() returns notification when gateway client returns success: false without throwing", async () => {
+      const failingGateway = {
+        send: jest.fn().mockResolvedValue({ success: false, messageId: "FAILED_ID" }),
+      };
+      setGatewayClient(failingGateway as any);
+
+      const notif = await dispatchNotification(dummyWarning, "BOTH");
+      expect(notif).toBeDefined();
+    });
+  });
+
+
+  // 3. RETRY & IDEMPOTENCY TEST CASES
+
+  describe("3. Retry & Idempotency Test Cases", () => {
+    test("3.1 retryNotificationDispatch() re-attempts pending/failed dispatch and succeeds once gateway recovers", async () => {
+      const mockGateway = new MockEmergencyGatewayClient();
+      mockGateway.setMode("UNAVAILABLE");
+      setGatewayClient(mockGateway);
+
+      await dispatchNotification(dummyWarning);
+      expect(mockWarningsStore[0].dispatchStatus).toBe("PENDING_DISPATCH");
+
+      // Switch gateway to SUCCESS and retry
+      mockGateway.setMode("SUCCESS");
+      const retriedNotif = await retryNotificationDispatch(dummyWarning.warningId);
+
+      expect(retriedNotif?.status).toBe("SENT");
+      expect(mockWarningsStore[0].dispatchStatus).toBe("SENT");
+    });
+
+    test("3.2 retryNotificationDispatch() on an already-SENT warning is idempotent (no re-send triggered)", async () => {
+      const mockGateway = new MockEmergencyGatewayClient();
+      mockGateway.setMode("SUCCESS");
+      setGatewayClient(mockGateway);
+
+      mockWarningsStore[0].dispatchStatus = "SENT";
+      mockNotificationsStore.push({
+        notificationId: "notif-1",
+        warningId: dummyWarning._id,
+        status: "SENT",
+        sentAt: new Date(),
+      });
+
+      const spySend = jest.spyOn(mockGateway, "send");
+      const retriedNotif = await retryNotificationDispatch(dummyWarning.warningId);
+
+      expect(retriedNotif?.status).toBe("SENT");
+      expect(spySend).not.toHaveBeenCalled();
+      spySend.mockRestore();
+    });
+
+    test("3.3 retryNotificationDispatch() throws descriptive error for non-existent warning ID", async () => {
+      await expect(retryNotificationDispatch("non-existent-warning-id")).rejects.toThrow(
+        "Warning with ID non-existent-warning-id not found"
+      );
+    });
   });
 });
