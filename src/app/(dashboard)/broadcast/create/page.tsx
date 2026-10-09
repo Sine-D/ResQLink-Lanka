@@ -298,27 +298,12 @@ function CreateBroadcastForm() {
         </div>
       )}
 
-      {/* Duplicate Active Warning Notice (E3) */}
-      {overlapWarning && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-1">
-          <div className="flex items-center gap-2 font-bold text-amber-400 text-sm">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Duplicate Active Warning Detected (E3)</span>
-          </div>
-          <p>
-            An active <strong>{overlapWarning.hazardType}</strong> warning is already broadcasting in{" "}
-            <strong>{overlapWarning.district}</strong> (Valid until:{" "}
-            {new Date(overlapWarning.validUntil).toLocaleString()}). Proceeding will create an overlapping alert.
-          </p>
-        </div>
-      )}
-
       {/* Optional: Based on Verified Incident Dropdown */}
       <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Based on Verified Incident (Optional Autofill)</span>
+            <span>Based on Verified Incident</span>
           </label>
           <span className="text-[10px] text-slate-400">
             {loadingIncidents ? "Loading verified incidents..." : `${verifiedIncidents.length} verified incident(s) available`}
