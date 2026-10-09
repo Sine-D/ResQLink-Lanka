@@ -84,6 +84,12 @@ export default function ShelterPage() {
     fetchEvacuees();
   }, []);
 
+  useEffect(() => {
+    if (shelters.length > 0 && !shelters.find(s => s.shelterId === selectedShelter)) {
+      setSelectedShelter(shelters[0].shelterId);
+    }
+  }, [shelters, selectedShelter]);
+
   const handleEditClick = (shelter: any) => {
     setSelectedShelterDetails(null);
     setEditingShelterId(shelter._id);
@@ -139,6 +145,42 @@ export default function ShelterPage() {
     }
   };
 
+  const handleBulkAllocate = async () => {
+    const shelter = shelters.find(s => s.shelterId === selectedShelter);
+    if (!shelter) return;
+    
+    const spacesLeft = Math.max(shelter.capacity - (shelter.occupancy || 0), 0);
+    let countToAllocate = parseInt(evacueeCount) || 0;
+    
+    if (countToAllocate > spacesLeft) {
+      countToAllocate = spacesLeft;
+    }
+    
+    try {
+      const newOccupancy = (shelter.occupancy || 0) + countToAllocate;
+      const res = await fetch(`/api/shelters/${shelter._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ occupancy: newOccupancy, capacity: shelter.capacity })
+      });
+      if (res.ok) {
+        alert(`Successfully allocated ${countToAllocate} evacuees to ${shelter.name}`);
+        const originalCount = parseInt(evacueeCount) || 0;
+        if (originalCount > spacesLeft) {
+          setEvacueeCount((originalCount - spacesLeft).toString());
+          const nextShelter = shelters.find(s => s.shelterId !== selectedShelter && s.capacity - (s.occupancy || 0) > 0);
+          if (nextShelter) setSelectedShelter(nextShelter.shelterId);
+        } else {
+          setEvacueeCount("");
+        }
+        fetchShelters();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to allocate evacuees.");
+    }
+  };
+
   const handleAddShelter = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -182,6 +224,11 @@ export default function ShelterPage() {
       console.error("Failed to save shelter", error);
     }
   };
+
+  const selectedShelterObj = shelters.find(s => s.shelterId === selectedShelter);
+  const selectedSpacesLeft = selectedShelterObj ? Math.max(selectedShelterObj.capacity - (selectedShelterObj.occupancy || 0), 0) : 0;
+  const countToAllocate = parseInt(evacueeCount) || 0;
+  const willExceedCapacity = selectedShelterObj && countToAllocate > selectedSpacesLeft;
 
   return (
     <div className="space-y-6 relative pb-12">
@@ -677,9 +724,12 @@ export default function ShelterPage() {
                   value={selectedShelter}
                   onChange={(e) => setSelectedShelter(e.target.value)}
                 >
-                  <option value="SH-001">SH-001 - Central High School (15 spaces left)</option>
-                  <option value="SH-009">SH-009 - Buddhist Center (108 spaces left)</option>
-                  <option value="SH-012">SH-012 - Municipal Stadium (380 spaces left)</option>
+                  {shelters.length === 0 && <option value="">No shelters available</option>}
+                  {shelters.map(s => (
+                    <option key={s._id} value={s.shelterId}>
+                      {s.shelterId} - {s.name} ({Math.max(s.capacity - (s.occupancy || 0), 0)} spaces left)
+                    </option>
+                  ))}
                 </select>
               </div>
               
@@ -689,18 +739,18 @@ export default function ShelterPage() {
                   type="number" 
                   value={evacueeCount}
                   onChange={(e) => setEvacueeCount(e.target.value)}
-                  className={`w-full bg-slate-950 border ${parseInt(evacueeCount) > 15 && selectedShelter === 'SH-001' ? 'border-red-500/50 text-red-400' : 'border-slate-800 text-white'} rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500`}
+                  className={`w-full bg-slate-950 border ${willExceedCapacity ? 'border-red-500/50 text-red-400' : 'border-slate-800 text-white'} rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500`}
                 />
               </div>
 
-              {parseInt(evacueeCount) > 15 && selectedShelter === 'SH-001' && (
+              {willExceedCapacity && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                   <div className="flex gap-2 text-red-400 text-sm font-bold mb-1 items-center">
                     <AlertTriangle className="w-4 h-4" />
                     Capacity Exceeded
                   </div>
                   <div className="text-xs text-red-500/80 leading-relaxed">
-                    Selected shelter only has 15 spaces remaining. Please allocate the remaining {parseInt(evacueeCount) - 15} evacuees to SH-009.
+                    Selected shelter only has {selectedSpacesLeft} spaces remaining. Please allocate the remaining {countToAllocate - selectedSpacesLeft} evacuees to another shelter.
                   </div>
                 </div>
               )}
@@ -709,8 +759,11 @@ export default function ShelterPage() {
                 <button className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
                   Cancel
                 </button>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
-                  {parseInt(evacueeCount) > 15 && selectedShelter === 'SH-001' ? "Allocate 15 Only" : "Allocate"}
+                <button 
+                  onClick={handleBulkAllocate}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors"
+                >
+                  {willExceedCapacity ? `Allocate ${selectedSpacesLeft} Only` : "Allocate"}
                 </button>
               </div>
             </div>
