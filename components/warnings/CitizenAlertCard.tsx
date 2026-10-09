@@ -44,7 +44,7 @@ export const CitizenAlertCard: React.FC<CitizenAlertCardProps> = ({ warning }) =
           <ShieldAlert className="w-4 h-4 animate-bounce" />
           <span>OFFICIAL EMERGENCY DISASTER ALERT</span>
         </div>
-        <WarningStatusBadge status={warning.severity.toUpperCase()} type="warning" />
+        <WarningStatusBadge status={warning.severity.toUpperCase()} type="severity" />
       </div>
 
       <div className="p-6 space-y-4">
