@@ -37,12 +37,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       className={
         isHazardReport
           ? "min-h-screen bg-slate-100"
-          : "min-h-screen flex bg-slate-950 text-slate-100"
+          : "h-screen flex overflow-hidden bg-slate-950 text-slate-100"
       }
     >
       {/* Sidebar Nav */}
       <aside
-        className={`${isHazardReport ? "hidden" : "flex"} w-64 bg-slate-900 border-r border-slate-800 flex-col justify-between p-4 shrink-0`}
+        className={`${
+          isHazardReport ? "hidden" : "flex"
+        } w-64 h-full bg-slate-900 border-r border-slate-800 flex-col justify-between p-4 shrink-0 overflow-y-auto`}
       >
         <div className="space-y-6">
           <Link href="/" className="flex items-center gap-2.5 px-2">
@@ -264,7 +266,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         className={
           isHazardReport
             ? "min-h-screen w-full overflow-y-auto"
-            : "flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl"
+            : "flex-1 h-full p-6 md:p-8 overflow-y-auto max-w-7xl"
         }
       >
         {children}
