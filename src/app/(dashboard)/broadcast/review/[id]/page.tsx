@@ -171,8 +171,7 @@ export default function BroadcastReviewDetailPage({ params }: ReviewPageProps) {
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div>
-            <span className="text-xs font-mono text-slate-400">UUID: {warning.warningId}</span>
-            <h2 className="text-xl font-black text-white mt-0.5">
+            <h2 className="text-xl font-black text-white">
               {warning.hazardType} Disaster Warning
             </h2>
           </div>
