@@ -1,6 +1,6 @@
-import { AlertDispatchService } from "../../src/lib/services/alert/AlertDispatchService";
-import { IEvacueeRepository } from "../../src/lib/repositories/IEvacueeRepository";
-import { ISmsProvider } from "../../src/lib/services/sms/ISmsProvider";
+import { AlertDispatchService } from "../../lib/services/alertDispatchService";
+import { IEvacueeRepository } from "../../lib/repositories/IEvacueeRepository";
+import { ISmsProvider } from "../../lib/services/sms/ISmsProvider";
 
 describe("AlertDispatchService", () => {
   let mockRepository: jest.Mocked<IEvacueeRepository>;
