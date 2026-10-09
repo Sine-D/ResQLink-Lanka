@@ -212,10 +212,9 @@ export default function EvacueePage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Registration Details */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        {/* Registration Details */}
+        <div className="lg:col-span-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 h-full">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-white">Registration Details</h2>
               <span className="text-sm font-mono text-slate-400">New Registration</span>
@@ -287,7 +286,7 @@ export default function EvacueePage() {
                       {householdMembers.map((member, idx) => (
                         <div key={idx} className="bg-slate-950/50 border border-slate-800 rounded-lg p-3 space-y-3">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-500">Member {idx + 1}</span>
+                             <span className="text-xs font-bold text-slate-500">Member {idx + 1}</span>
                           </div>
                           <div className="grid grid-cols-3 gap-3">
                             <div className="col-span-2">
@@ -383,53 +382,14 @@ export default function EvacueePage() {
               </div>
             </div>
           </div>
-
-          {/* Registered Family List */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-x-auto">
-            <div className="flex justify-between items-center mb-6 min-w-max gap-4">
-              <h2 className="text-lg font-bold text-white">Registered Family List</h2>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Recent</button>
-                <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Vulnerable</button>
-              </div>
-            </div>
-
-            <table className="w-full text-sm text-left min-w-[600px]">
-              <thead>
-                <tr className="text-xs text-slate-400 border-b border-slate-800">
-                  <th className="pb-3 font-semibold">Case ID</th>
-                  <th className="pb-3 font-semibold">Head of Household</th>
-                  <th className="pb-3 font-semibold text-center">Family Size</th>
-                  <th className="pb-3 font-semibold">Vulnerability</th>
-                  <th className="pb-3 font-semibold">Origin</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {evacuees.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-500">No registered families yet.</td>
-                  </tr>
-                ) : evacuees.map(evacuee => (
-                  <tr key={evacuee._id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-blue-400">{evacuee.caseId}</td>
-                    <td className="py-4 text-white font-bold">{evacuee.headOfHousehold} <span className="text-slate-400 font-normal text-xs">({evacuee.headOfHouseholdAge})</span></td>
-                    <td className="py-4 text-white text-center font-bold">{evacuee.householdSize}</td>
-                    <td className="py-4 text-slate-300">{evacuee.vulnerability || "-"}</td>
-                    <td className="py-4 text-slate-400 truncate max-w-[200px]" title={evacuee.originAddress}>{evacuee.originAddress}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-6">
-          {/* Allocation Summary */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center">
+        {/* Allocation Summary */}
+        <div className="lg:col-span-1">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center h-full flex flex-col justify-center">
             <h2 className="text-left text-lg font-bold text-white mb-6">Allocation Summary</h2>
             
-            <div className="relative w-32 h-32 mx-auto mb-4">
+            <div className="relative w-40 h-40 mx-auto mb-6 mt-4">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                 <path
                   className="text-slate-800"
@@ -449,12 +409,12 @@ export default function EvacueePage() {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-black text-white">{saturationPercentage}%</span>
+                <span className="text-4xl font-black text-white">{saturationPercentage}%</span>
               </div>
             </div>
             <p className="text-xs text-slate-400 mb-8">Total District Saturation</p>
 
-            <div className="text-left">
+            <div className="text-left mt-6">
               <div className="flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase">
                 <span>Resources Deployed</span>
                 <span className="text-white">{resourcesDeployedPercentage}%</span>
@@ -464,54 +424,46 @@ export default function EvacueePage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Audit & Activity Log */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col">
-            <h2 className="text-lg font-bold text-white mb-6">Audit & Activity Log</h2>
-            
-            <div className="flex-1 space-y-6 relative before:absolute before:inset-0 before:ml-2 md:before:ml-[5px] before:-translate-x-px before:h-full before:w-0.5 before:bg-slate-800">
-              
-              <div className="relative flex items-start gap-4">
-                <div className="flex items-center justify-center w-3 h-3 mt-1.5 rounded-full border border-slate-900 bg-blue-500 relative z-10 shrink-0"></div>
-                <div>
-                  <div className="text-sm font-bold text-white">Case Opened</div>
-                  <div className="text-xs text-slate-400 mt-0.5">14:15:22 - Officer J. Smith</div>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="flex items-center justify-center w-3 h-3 mt-1.5 rounded-full border border-slate-900 bg-blue-500 relative z-10 shrink-0"></div>
-                <div>
-                  <div className="text-sm font-bold text-white">GPS Coordinates Synced</div>
-                  <div className="text-xs text-slate-400 mt-0.5">14:16:05 - System Auto</div>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="flex items-center justify-center w-3 h-3 mt-1.5 rounded-full border border-slate-900 bg-red-500 relative z-10 shrink-0"></div>
-                <div>
-                  <div className="text-sm font-bold text-red-400">Medical Alert Flagged</div>
-                  <div className="text-xs text-slate-400 mt-0.5">14:18:40 - Data Validation</div>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="flex items-center justify-center w-3 h-3 mt-1.5 rounded-full border border-slate-900 bg-slate-600 relative z-10 shrink-0"></div>
-                <div>
-                  <div className="text-sm font-medium text-slate-500">Pending Allocation...</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-3">
-              <button className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl text-sm hover:bg-blue-700 transition-colors">
-                CONFIRM ALLOCATION
-              </button>
-              <button className="w-full bg-slate-800 border border-slate-700 text-white font-bold py-3 rounded-xl text-sm hover:bg-slate-700 transition-colors">
-                SAVE DRAFT
-              </button>
+      {/* Registered Family List */}
+      <div className="w-full">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-x-auto">
+          <div className="flex justify-between items-center mb-6 min-w-max gap-4">
+            <h2 className="text-lg font-bold text-white">Registered Family List</h2>
+            <div className="flex gap-2">
+              <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Recent</button>
+              <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Vulnerable</button>
             </div>
           </div>
+
+          <table className="w-full text-sm text-left min-w-[600px]">
+            <thead>
+              <tr className="text-xs text-slate-400 border-b border-slate-800">
+                <th className="pb-3 font-semibold">Case ID</th>
+                <th className="pb-3 font-semibold">Head of Household</th>
+                <th className="pb-3 font-semibold text-center">Family Size</th>
+                <th className="pb-3 font-semibold">Vulnerability</th>
+                <th className="pb-3 font-semibold">Origin</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {evacuees.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-500">No registered families yet.</td>
+                </tr>
+              ) : evacuees.map(evacuee => (
+                <tr key={evacuee._id} className="hover:bg-slate-800/30 transition-colors">
+                  <td className="py-4 font-bold text-blue-400">{evacuee.caseId}</td>
+                  <td className="py-4 text-white font-bold">{evacuee.headOfHousehold} <span className="text-slate-400 font-normal text-xs">({evacuee.headOfHouseholdAge})</span></td>
+                  <td className="py-4 text-white text-center font-bold">{evacuee.householdSize}</td>
+                  <td className="py-4 text-slate-300">{evacuee.vulnerability || "-"}</td>
+                  <td className="py-4 text-slate-400 truncate max-w-[200px]" title={evacuee.originAddress}>{evacuee.originAddress}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
