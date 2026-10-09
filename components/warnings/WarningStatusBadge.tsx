@@ -2,13 +2,31 @@ import React from "react";
 
 interface WarningStatusBadgeProps {
   status: string;
-  type?: "warning" | "dispatch";
+  type?: "warning" | "dispatch" | "severity";
 }
 
 export const WarningStatusBadge: React.FC<WarningStatusBadgeProps> = ({ status, type = "warning" }) => {
   let badgeStyles = "bg-slate-100 text-slate-700 border-slate-300";
 
-  if (type === "warning") {
+  if (type === "severity") {
+    switch (status?.toUpperCase()) {
+      case "CRITICAL":
+        badgeStyles = "bg-red-500/10 text-red-400 border-red-500/30 font-bold";
+        break;
+      case "HIGH":
+        badgeStyles = "bg-orange-500/10 text-orange-400 border-orange-500/30 font-semibold";
+        break;
+      case "MEDIUM":
+        badgeStyles = "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
+        break;
+      case "LOW":
+        badgeStyles = "bg-blue-500/10 text-blue-400 border-blue-500/30";
+        break;
+      default:
+        badgeStyles = "bg-slate-500/10 text-slate-400 border-slate-500/30";
+        break;
+    }
+  } else if (type === "warning") {
     switch (status) {
       case "ACTIVE":
         badgeStyles = "bg-red-500/10 text-red-600 border-red-500/30 font-semibold animate-pulse";
