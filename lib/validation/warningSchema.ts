@@ -28,11 +28,13 @@ export const hazardTypeEnum = z.enum([
   "Drought",
   "FlashFlood",
 ]);
+export const HAZARD_TYPES = hazardTypeEnum.options;
 
 /**
  * Standard four-tier severity classification adhering to disaster response protocols.
  */
 export const severityEnum = z.enum(["Low", "Medium", "High", "Critical"]);
+export const SEVERITY_LEVELS = severityEnum.options;
 
 // ============================================================================
 // GEOSPATIAL VALIDATION SCHEMAS
