@@ -6,12 +6,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
-  ShieldAlert,
   Radio,
   PlusCircle,
-  FileSpreadsheet,
-  Truck,
-  Boxes,
   Bell,
   LogOut,
   User,
@@ -77,9 +73,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 >
                   <Radio className="w-4 h-4" />
                   <span>Warnings Dashboard</span>
-                  <span className="ml-auto text-[9px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-800">
-                    FULL
-                  </span>
                 </Link>
 
                 <Link
@@ -92,39 +85,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span>Issue New Warning</span>
-                  <span className="ml-auto text-[9px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-800">
-                    FULL
-                  </span>
-                </Link>
-
-                <Link
-                  href="/dmc/hazard-reports"
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                    pathname.startsWith("/dmc/hazard-reports")
-                      ? "bg-red-600 text-white shadow-md shadow-red-600/30"
-                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-                  }`}
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Hazard Verifications</span>
-                  <span className="ml-auto text-[9px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-800">
-                    FULL
-                  </span>
-                </Link>
-
-                <Link
-                  href="/dmc/relief-resources"
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                    pathname.startsWith("/dmc/relief-resources")
-                      ? "bg-slate-800 text-white"
-                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-                  }`}
-                >
-                  <Boxes className="w-4 h-4" />
-                  <span>Relief Stock Hub</span>
-                  <span className="ml-auto text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
-                    STUB
-                  </span>
                 </Link>
               </>
             )}
@@ -280,8 +240,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <User className="w-4 h-4" />
             </div>
             <div className="truncate">
-              <div className="text-xs font-bold text-white truncate">{userName}</div>
-              <div className="text-[10px] text-slate-400 truncate">{userRole}</div>
+              <div className="text-xs font-bold text-white truncate">
+                {isDmc ? "DMC Officer" : userName}
+              </div>
+              {!isDmc && (
+                <div className="text-[10px] text-slate-400 truncate">{userRole}</div>
+              )}
             </div>
           </div>
 

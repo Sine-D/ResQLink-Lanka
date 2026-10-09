@@ -15,9 +15,6 @@ export default function AboutPage() {
             <Image src="/logo.jpg" alt="ResQLink Lanka Logo" width={64} height={64} className="w-full h-full object-cover" priority />
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white">About ResQLink Lanka</h1>
-          <p className="text-slate-400 text-sm max-w-2xl mx-auto">
-            Smart Disaster Early-Warning & Emergency Coordination System built for SE3070 Coursework Assignment A02.
-          </p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 text-sm text-slate-300 leading-relaxed">
@@ -26,23 +23,23 @@ export default function AboutPage() {
             ResQLink Lanka is designed to bridge critical gaps between disaster management authorities and citizens during rapid-onset natural disasters such as floods, landslides, cyclones, and tsunamis across Sri Lanka.
           </p>
 
-          <h3 className="text-lg font-bold text-white pt-4">Module Implementation Scope</h3>
-          <ul className="space-y-2">
+          <h3 className="text-lg font-bold text-white pt-4">Core System Modules</h3>
+          <ul className="space-y-3">
             <li className="flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-red-500 mt-1 shrink-0" />
-              <span><strong>Member 1 (Fully Implemented):</strong> Issue Location-Based Disaster Warning. Includes Zod validation schemas, Leaflet GIS polygon geofencing, population density reach calculation, publish order persistence, and notification retry handling.</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1 shrink-0" />
+              <span><strong>Disaster Warning & Alerts:</strong> Location-based early warnings with GIS map polygon geofencing, population density reach estimation, multi-level severity classification, and automated multi-channel broadcasts with retry handling.</span>
             </li>
             <li className="flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-slate-500 mt-1 shrink-0" />
-              <span><strong>Member 2 (Stub):</strong> Hazard Reporting module scaffold with photo attachment schema and verification workflow notes.</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1 shrink-0" />
+              <span><strong>Citizen Hazard Reporting:</strong> Real-time crowd-sourced incident reporting with GPS geolocated coordinates, photo evidence attachments, and DMC officer verification and triage queues.</span>
             </li>
             <li className="flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-slate-500 mt-1 shrink-0" />
-              <span><strong>Member 3 (Stub):</strong> Rescue Team Dispatch module scaffold with incident model and team assignment endpoint.</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1 shrink-0" />
+              <span><strong>Rescue Team Dispatch:</strong> Emergency incident mapping, district rescue unit matching, automated deployment routing, and real-time field mission status tracking.</span>
             </li>
             <li className="flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-slate-500 mt-1 shrink-0" />
-              <span><strong>Member 4 (Stub):</strong> Relief Resource Distribution module scaffold with stock inventory model and distribution log endpoint.</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1 shrink-0" />
+              <span><strong>Relief Resource Distribution:</strong> Centralized warehouse supply management, aid inventory allocation, transparent citizen distribution logging, and relief tracking.</span>
             </li>
           </ul>
         </div>
