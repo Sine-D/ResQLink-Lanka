@@ -36,6 +36,46 @@ export default function EvacueePage() {
   const [householdMembers, setHouseholdMembers] = useState<{name: string, age: number | "", details: string}[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [evacuees, setEvacuees] = useState<any[]>([]);
+  const [saturationPercentage, setSaturationPercentage] = useState(0);
+  const [resourcesDeployedPercentage, setResourcesDeployedPercentage] = useState(0);
+
+  const fetchStats = async () => {
+    try {
+      const [sheltersRes, teamsRes] = await Promise.all([
+        fetch("/api/shelters"),
+        fetch("/api/rescue-teams")
+      ]);
+      
+      if (sheltersRes.ok) {
+        const data = await sheltersRes.json();
+        const shelters = data.shelters || [];
+        let totalCapacity = 0;
+        let totalOccupancy = 0;
+        shelters.forEach((s: any) => {
+          totalCapacity += s.capacity || 0;
+          totalOccupancy += s.occupancy || 0;
+        });
+        if (totalCapacity > 0) {
+          setSaturationPercentage(Math.round((totalOccupancy / totalCapacity) * 100));
+        } else {
+          setSaturationPercentage(0);
+        }
+      }
+
+      if (teamsRes.ok) {
+        const teams = await teamsRes.json();
+        const totalTeams = teams.length;
+        const deployedTeams = teams.filter((t: any) => !t.isAvailable || t.assignedIncident).length;
+        if (totalTeams > 0) {
+          setResourcesDeployedPercentage(Math.round((deployedTeams / totalTeams) * 100));
+        } else {
+          setResourcesDeployedPercentage(0);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    }
+  };
 
   const fetchEvacuees = async () => {
     try {
@@ -51,6 +91,7 @@ export default function EvacueePage() {
 
   useEffect(() => {
     fetchEvacuees();
+    fetchStats();
   }, []);
 
   const handleHouseholdSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -399,15 +440,16 @@ export default function EvacueePage() {
                 />
                 <path
                   className="text-blue-500"
-                  strokeDasharray="92, 100"
+                  strokeDasharray={`${saturationPercentage}, 100`}
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="4"
+                  style={{ transition: "stroke-dasharray 0.5s ease" }}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-black text-white">92%</span>
+                <span className="text-3xl font-black text-white">{saturationPercentage}%</span>
               </div>
             </div>
             <p className="text-xs text-slate-400 mb-8">Total District Saturation</p>
@@ -415,10 +457,10 @@ export default function EvacueePage() {
             <div className="text-left">
               <div className="flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase">
                 <span>Resources Deployed</span>
-                <span className="text-white">84%</span>
+                <span className="text-white">{resourcesDeployedPercentage}%</span>
               </div>
               <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: '84%' }}></div>
+                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${resourcesDeployedPercentage}%`, transition: "width 0.5s ease" }}></div>
               </div>
             </div>
           </div>

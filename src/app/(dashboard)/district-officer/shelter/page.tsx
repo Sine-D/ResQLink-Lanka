@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useSession } from "next-auth/react";
 
 const MapSelector = dynamic(() => import('@/components/MapSelector'), { ssr: false });
+const SheltersMap = dynamic(() => import('@/components/SheltersMap'), { ssr: false });
 
 const chartData = [
   { time: "08:00", occupancy: 3100, capacity: 8400 },
@@ -716,19 +717,19 @@ export default function ShelterPage() {
           </div>
 
           {/* Shelter Proximity Map */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col h-[500px]">
             <h2 className="text-lg font-bold text-white mb-4">Shelter Proximity Map</h2>
-            <div className="bg-slate-800 rounded-xl h-48 relative overflow-hidden flex items-center justify-center">
-              <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#475569 1px, transparent 1px)', backgroundSize: '15px 15px' }}></div>
-              <div className="absolute top-3 right-3 bg-slate-900/90 border border-slate-700 rounded-lg p-2 text-[10px] font-semibold text-slate-300 space-y-1.5 z-10">
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Available</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Near Capacity</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div> Full</div>
+            <div className="flex-1 bg-slate-950 border border-slate-800 rounded-xl relative overflow-hidden">
+              <SheltersMap shelters={shelters} />
+              
+              <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-sm border border-slate-700 rounded-lg p-3 text-[10px] font-semibold text-slate-300 space-y-2 z-[400] shadow-xl">
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Available</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> Near Capacity</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div> Full</div>
               </div>
-              <div className="absolute bottom-3 left-3 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded text-[10px] font-bold text-slate-400 z-10">
+              <div className="absolute bottom-4 left-4 bg-slate-900/90 backdrop-blur-sm border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-400 z-[400] shadow-xl">
                 Radius: 5.0 km
               </div>
-              <span className="text-slate-500 font-medium text-sm z-0">Interactive Map View Placeholder</span>
             </div>
           </div>
 
