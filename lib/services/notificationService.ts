@@ -162,19 +162,69 @@ export async function dispatchNotification(
     });
   }
 
+  // E5 Gateway Health Check (if supported by client)
+  if (typeof (activeGatewayClient as any).isHealthy === "function") {
+    try {
+      const isHealthy = await (activeGatewayClient as any).isHealthy();
+      if (!isHealthy) {
+        throw new GatewayUnavailableError("Notification Gateway health check failed: Gateway offline");
+      }
+    } catch (healthErr: unknown) {
+      notification.status = "PENDING_DISPATCH";
+      notification.errorLog = `[UNAVAILABLE] ${healthErr instanceof Error ? healthErr.message : String(healthErr)}`;
+      notification.retryCount += 1;
+      await notification.save();
+      await Warning.findByIdAndUpdate(warning._id, { dispatchStatus: "PENDING_DISPATCH" });
+      return notification;
+    }
+  }
+
+  let activeChannel = channel;
   try {
     // Attempt dispatch via injectable gateway client abstraction
-    const result = await activeGatewayClient.send({
+    let result = await activeGatewayClient.send({
       district: warning.targetArea.districtName,
-      channel,
+      channel: activeChannel,
       message,
       targetReach: warning.targetArea.estimatedReach,
     });
 
+    // E4: If channel is PUSH and gateway returns non-throwing failure, retry 3 times then fallback to SMS
+    if (!result.success && activeChannel === "PUSH") {
+      let retries = 0;
+      while (retries < 3 && !result.success) {
+        retries++;
+        try {
+          result = await activeGatewayClient.send({
+            district: warning.targetArea.districtName,
+            channel: "PUSH",
+            message,
+            targetReach: warning.targetArea.estimatedReach,
+          });
+        } catch {
+          // Next retry iteration
+        }
+      }
+
+      if (!result.success) {
+        // Fallback to SMS channel (E4)
+        activeChannel = "SMS";
+        notification.channel = "SMS";
+        notification.errorLog = `[FALLBACK_E4] Push alert failed after 3 retries; successfully failed over to SMS broadcast channel.`;
+        result = await activeGatewayClient.send({
+          district: warning.targetArea.districtName,
+          channel: "SMS",
+          message,
+          targetReach: warning.targetArea.estimatedReach,
+        });
+      }
+    }
+
     if (result.success) {
       notification.status = "SENT";
+      notification.channel = activeChannel;
       notification.sentAt = new Date();
-      notification.errorLog = null;
+      notification.errorLog = notification.errorLog || null;
       await notification.save();
 
       await Warning.findByIdAndUpdate(warning._id, { dispatchStatus: "SENT" });
