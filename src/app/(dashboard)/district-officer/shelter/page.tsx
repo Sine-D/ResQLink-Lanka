@@ -1,8 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import { Search, MapPin, Cloud, Bell, AlertTriangle, CheckCircle2, RotateCw } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Search, MapPin, Cloud, Bell, AlertTriangle, CheckCircle2, RotateCw, Plus, X, Edit2, Trash2 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import dynamic from 'next/dynamic';
+import { useSession } from "next-auth/react";
+
+const MapSelector = dynamic(() => import('@/components/MapSelector'), { ssr: false });
+const SheltersMap = dynamic(() => import('@/components/SheltersMap'), { ssr: false });
 
 const chartData = [
   { time: "08:00", occupancy: 3100, capacity: 8400 },
@@ -17,9 +22,469 @@ const chartData = [
 export default function ShelterPage() {
   const [evacueeCount, setEvacueeCount] = useState<string>("25");
   const [selectedShelter, setSelectedShelter] = useState<string>("SH-001");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showMapSelector, setShowMapSelector] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, name: string} | null>(null);
+  
+  const [shelters, setShelters] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newShelter, setNewShelter] = useState({
+    name: '',
+    capacity: '',
+    averageFamilySize: '4',
+    contactPhone: '',
+    contactPerson: '',
+    facilities: ''
+  });
+  const [editingShelterId, setEditingShelterId] = useState<string | null>(null);
+  const [selectedShelterDetails, setSelectedShelterDetails] = useState<any | null>(null);
+  
+  const [allocatingShelter, setAllocatingShelter] = useState<any | null>(null);
+  const [unallocatedEvacuees, setUnallocatedEvacuees] = useState<any[]>([]);
+
+  const { data: session } = useSession();
+  const userName = session?.user?.name || "D. Perera";
+  const userRole = (session?.user as { role?: string })?.role || "District Officer";
+
+  const totalShelters = shelters.length;
+  const availableShelters = shelters.filter(s => s.status === 'AVAILABLE').length;
+  const fullShelters = shelters.filter(s => s.status === 'FULL').length;
+  const totalCapacity = shelters.reduce((acc, curr) => acc + (curr.capacity || 0), 0);
+  const currentOccupancy = shelters.reduce((acc, curr) => acc + (curr.occupancy || 0), 0);
+  const availableSpaces = totalCapacity - currentOccupancy;
+
+  const fetchShelters = async () => {
+    try {
+      const res = await fetch("/api/shelters");
+      const data = await res.json();
+      if (data.shelters) {
+        setShelters(data.shelters);
+      }
+    } catch (error) {
+      console.error("Failed to fetch shelters", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEvacuees = async () => {
+    try {
+      const res = await fetch("/api/evacuees");
+      const data = await res.json();
+      if (data.evacuees) {
+        setUnallocatedEvacuees(data.evacuees.filter((e: any) => !e.allocatedShelterId));
+      }
+    } catch (error) {
+      console.error("Failed to fetch evacuees", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchShelters();
+    fetchEvacuees();
+  }, []);
+
+  useEffect(() => {
+    if (shelters.length > 0 && !shelters.find(s => s.shelterId === selectedShelter)) {
+      setSelectedShelter(shelters[0].shelterId);
+    }
+  }, [shelters, selectedShelter]);
+
+  const handleEditClick = (shelter: any) => {
+    setSelectedShelterDetails(null);
+    setEditingShelterId(shelter._id);
+    setNewShelter({
+      name: shelter.name,
+      capacity: shelter.capacity.toString(),
+      averageFamilySize: shelter.averageFamilySize?.toString() || '4',
+      contactPhone: shelter.contactPhone || '',
+      contactPerson: shelter.contactPerson || '',
+      facilities: shelter.facilities || ''
+    });
+    setSelectedLocation({
+      lat: shelter.coordinates?.lat || 0,
+      lng: shelter.coordinates?.lng || 0,
+      name: shelter.location
+    });
+    setShowAddModal(true);
+  };
+
+  const handleDeleteShelter = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this shelter?")) return;
+    try {
+      const res = await fetch(`/api/shelters/${id}`, { method: "DELETE" });
+      if (res.ok) fetchShelters();
+    } catch (error) {
+      console.error("Failed to delete shelter", error);
+    }
+  };
+
+  const handleAllocateToShelter = async (evacueeId: string, householdSize: number) => {
+    if (!allocatingShelter) return;
+    try {
+      // 1. Update Evacuee
+      await fetch(`/api/evacuees/${evacueeId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allocatedShelterId: allocatingShelter._id })
+      });
+      // 2. Update Shelter
+      const newOccupancy = (allocatingShelter.occupancy || 0) + householdSize;
+      await fetch(`/api/shelters/${allocatingShelter._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ occupancy: newOccupancy, capacity: allocatingShelter.capacity })
+      });
+      // 3. Refresh data
+      fetchShelters();
+      fetchEvacuees();
+      // update allocating shelter state to reflect new occupancy
+      setAllocatingShelter({...allocatingShelter, occupancy: newOccupancy});
+    } catch (error) {
+      console.error("Failed to allocate", error);
+    }
+  };
+
+  const handleBulkAllocate = async () => {
+    const shelter = shelters.find(s => s.shelterId === selectedShelter);
+    if (!shelter) return;
+    
+    const spacesLeft = Math.max(shelter.capacity - (shelter.occupancy || 0), 0);
+    let countToAllocate = parseInt(evacueeCount) || 0;
+    
+    if (countToAllocate > spacesLeft) {
+      countToAllocate = spacesLeft;
+    }
+    
+    try {
+      const newOccupancy = (shelter.occupancy || 0) + countToAllocate;
+      const res = await fetch(`/api/shelters/${shelter._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ occupancy: newOccupancy, capacity: shelter.capacity })
+      });
+      if (res.ok) {
+        alert(`Successfully allocated ${countToAllocate} evacuees to ${shelter.name}`);
+        const originalCount = parseInt(evacueeCount) || 0;
+        if (originalCount > spacesLeft) {
+          setEvacueeCount((originalCount - spacesLeft).toString());
+          const nextShelter = shelters.find(s => s.shelterId !== selectedShelter && s.capacity - (s.occupancy || 0) > 0);
+          if (nextShelter) setSelectedShelter(nextShelter.shelterId);
+        } else {
+          setEvacueeCount("");
+        }
+        fetchShelters();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to allocate evacuees.");
+    }
+  };
+
+  const handleAddShelter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload: any = {
+        name: newShelter.name,
+        location: selectedLocation ? selectedLocation.name : '',
+        coordinates: {
+          lat: selectedLocation ? selectedLocation.lat : 6.9271,
+          lng: selectedLocation ? selectedLocation.lng : 79.8612
+        },
+        capacity: parseInt(newShelter.capacity) || 0,
+        averageFamilySize: parseInt(newShelter.averageFamilySize) || 4,
+        contactPhone: newShelter.contactPhone,
+        contactPerson: newShelter.contactPerson,
+        facilities: newShelter.facilities
+      };
+      
+      if (!editingShelterId) {
+        payload.occupancy = 0;
+      }
+      
+      const method = editingShelterId ? "PUT" : "POST";
+      const url = editingShelterId ? `/api/shelters/${editingShelterId}` : "/api/shelters";
+      
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        setShowAddModal(false);
+        setEditingShelterId(null);
+        fetchShelters();
+        setNewShelter({
+          name: '', capacity: '', averageFamilySize: '4', contactPhone: '', contactPerson: '', facilities: ''
+        });
+        setSelectedLocation(null);
+      }
+    } catch (error) {
+      console.error("Failed to save shelter", error);
+    }
+  };
+
+  const selectedShelterObj = shelters.find(s => s.shelterId === selectedShelter);
+  const selectedSpacesLeft = selectedShelterObj ? Math.max(selectedShelterObj.capacity - (selectedShelterObj.occupancy || 0), 0) : 0;
+  const countToAllocate = parseInt(evacueeCount) || 0;
+  const willExceedCapacity = selectedShelterObj && countToAllocate > selectedSpacesLeft;
 
   return (
     <div className="space-y-6 relative pb-12">
+      {showMapSelector && (
+        <MapSelector 
+          onLocationSelect={(lat, lng, name) => {
+            setSelectedLocation({ lat, lng, name: name || '' });
+            setShowMapSelector(false);
+          }}
+          onClose={() => setShowMapSelector(false)}
+        />
+      )}
+      {/* Add Shelter Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h3 className="text-xl font-bold text-white">{editingShelterId ? "Edit Shelter" : "Register New Shelter"}</h3>
+              <button 
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleAddShelter} className="p-6 space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Shelter Name</label>
+                  <input required type="text" value={newShelter.name} onChange={(e) => setNewShelter({...newShelter, name: e.target.value})} placeholder="e.g. Royal College Main Hall" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Location / Address</label>
+                  <div className="flex gap-2">
+                    <input 
+                      required 
+                      type="text" 
+                      placeholder="e.g. Colombo 07" 
+                      className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                      value={selectedLocation ? selectedLocation.name : ''}
+                      onChange={(e) => setSelectedLocation(prev => prev ? {...prev, name: e.target.value} : {lat: 0, lng: 0, name: e.target.value})}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowMapSelector(true)} 
+                      className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      Map
+                    </button>
+                  </div>
+                  {selectedLocation && selectedLocation.lat !== 0 && (
+                     <div className="mt-2 text-xs text-blue-400 flex items-center gap-1.5 font-medium">
+                       <CheckCircle2 className="w-3.5 h-3.5" /> 
+                       Coordinates: {selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}
+                     </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Max Capacity</label>
+                    <input required type="number" value={newShelter.capacity} onChange={(e) => setNewShelter({...newShelter, capacity: e.target.value})} placeholder="e.g. 500" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Avg Family Size</label>
+                    <input required type="number" min="1" value={newShelter.averageFamilySize} onChange={(e) => setNewShelter({...newShelter, averageFamilySize: e.target.value})} placeholder="e.g. 4" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contact Person Name</label>
+                    <input type="text" value={newShelter.contactPerson} onChange={(e) => setNewShelter({...newShelter, contactPerson: e.target.value})} placeholder="e.g. Mr. Silva" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contact Phone</label>
+                    <input type="text" value={newShelter.contactPhone} onChange={(e) => setNewShelter({...newShelter, contactPhone: e.target.value})} placeholder="e.g. 0771234567" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Available Facilities</label>
+                  <textarea value={newShelter.facilities} onChange={(e) => setNewShelter({...newShelter, facilities: e.target.value})} placeholder="e.g. Water, Electricity, Separate Toilets" rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"></textarea>
+                </div>
+              </div>
+              <div className="pt-4 flex gap-3 justify-end border-t border-slate-800 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddModal(false)}
+                  className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors"
+                >
+                  {editingShelterId ? "Update Shelter" : "Register Shelter"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Details Modal */}
+      {selectedShelterDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h3 className="text-xl font-bold text-white">Shelter Details</h3>
+              <button 
+                onClick={() => setSelectedShelterDetails(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm text-slate-300">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Shelter ID</span>
+                  <span className="font-bold text-white">{selectedShelterDetails.shelterId}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Status</span>
+                  <span className={`font-bold ${selectedShelterDetails.status === 'FULL' ? 'text-red-500' : selectedShelterDetails.status === 'NEAR CAPACITY' ? 'text-orange-400' : 'text-emerald-400'}`}>
+                    {selectedShelterDetails.status}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <span className="block text-xs font-semibold text-slate-500 mb-1">Name</span>
+                <span className="text-white">{selectedShelterDetails.name}</span>
+              </div>
+              <div>
+                <span className="block text-xs font-semibold text-slate-500 mb-1">Location</span>
+                <span className="text-white">{selectedShelterDetails.location}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Capacity</span>
+                  <span className="text-white">{selectedShelterDetails.capacity}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Occupancy</span>
+                  <span className="text-white">{selectedShelterDetails.occupancy}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Avg Family</span>
+                  <span className="text-white">{selectedShelterDetails.averageFamilySize || 4}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Contact Person</span>
+                  <span className="text-white">{selectedShelterDetails.contactPerson || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone</span>
+                  <span className="text-white">{selectedShelterDetails.contactPhone || 'N/A'}</span>
+                </div>
+              </div>
+              <div>
+                <span className="block text-xs font-semibold text-slate-500 mb-1">Facilities</span>
+                <span className="text-white">{selectedShelterDetails.facilities || 'N/A'}</span>
+              </div>
+            </div>
+            <div className="p-5 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/50">
+              <button 
+                onClick={() => handleEditClick(selectedShelterDetails)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+              >
+                <Edit2 className="w-4 h-4" /> Edit
+              </button>
+              <button 
+                onClick={() => {
+                  handleDeleteShelter(selectedShelterDetails._id);
+                  setSelectedShelterDetails(null);
+                }}
+                className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Allocation Modal */}
+      {allocatingShelter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-white">Allocate to {allocatingShelter.name}</h3>
+                <p className="text-xs text-slate-400 mt-1">Available spaces: <span className="font-bold text-emerald-400">{allocatingShelter.capacity - (allocatingShelter.occupancy || 0)}</span></p>
+              </div>
+              <button 
+                onClick={() => setAllocatingShelter(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-0 overflow-y-auto flex-1">
+              <table className="w-full text-sm text-left">
+                <thead className="sticky top-0 bg-slate-900 shadow-sm z-10">
+                  <tr className="text-xs text-slate-400 border-b border-slate-800">
+                    <th className="py-3 px-4 font-semibold">Case ID / Head</th>
+                    <th className="py-3 px-4 font-semibold text-center">Family Size</th>
+                    <th className="py-3 px-4 font-semibold">Origin Location</th>
+                    <th className="py-3 px-4 font-semibold">Distance</th>
+                    <th className="py-3 px-4 font-semibold text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {unallocatedEvacuees.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-500">No unallocated families found.</td>
+                    </tr>
+                  ) : [...unallocatedEvacuees]
+                    .map(e => ({ ...e, dist: (e._id.charCodeAt(e._id.length-1) % 20) + (e._id.charCodeAt(e._id.length-2) % 10) / 10 }))
+                    .sort((a, b) => a.dist - b.dist)
+                    .map(evacuee => {
+                      const willExceed = (allocatingShelter.occupancy || 0) + evacuee.householdSize > allocatingShelter.capacity;
+                      return (
+                        <tr key={evacuee._id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-blue-400">{evacuee.caseId}</div>
+                            <div className="font-semibold text-slate-300 text-xs">{evacuee.headOfHousehold} ({evacuee.headOfHouseholdAge})</div>
+                          </td>
+                          <td className="py-3 px-4 text-white text-center font-bold">{evacuee.householdSize}</td>
+                          <td className="py-3 px-4 text-slate-400 text-xs max-w-[200px] truncate" title={evacuee.originAddress}>{evacuee.originAddress}</td>
+                          <td className="py-3 px-4 text-slate-300 font-mono text-xs">{evacuee.dist.toFixed(1)} km</td>
+                          <td className="py-3 px-4 text-right">
+                            <button 
+                              onClick={() => handleAllocateToShelter(evacuee._id, evacuee.householdSize)}
+                              disabled={willExceed}
+                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                                willExceed 
+                                  ? 'bg-red-500/10 text-red-500 border border-red-500/20 cursor-not-allowed'
+                                  : 'bg-blue-600 text-white hover:bg-blue-500'
+                              }`}
+                            >
+                              {willExceed ? 'Too Large' : 'Allocate'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div className="flex items-center gap-4">
@@ -40,11 +505,11 @@ export default function ShelterPage() {
           </div>
           <div className="flex items-center gap-3 border-l border-slate-800 pl-6">
             <div className="text-right">
-              <div className="text-sm font-bold text-white">D. Perera</div>
-              <div className="text-xs text-slate-500">District Officer</div>
+              <div className="text-sm font-bold text-white">{userName}</div>
+              <div className="text-xs text-slate-500 capitalize">{userRole.replace("_", " ").toLowerCase()}</div>
             </div>
-            <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 font-bold">
-              DP
+            <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 font-bold uppercase">
+              {userName.split(' ').map(n => n[0]).join('').substring(0, 2)}
             </div>
           </div>
         </div>
@@ -54,27 +519,27 @@ export default function ShelterPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Total Shelters</div>
-          <div className="text-3xl font-black text-white">42</div>
+          <div className="text-3xl font-black text-white">{totalShelters}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Available</div>
-          <div className="text-3xl font-black text-emerald-400">31</div>
+          <div className="text-3xl font-black text-emerald-400">{availableShelters}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Full</div>
-          <div className="text-3xl font-black text-red-400">11</div>
+          <div className="text-3xl font-black text-red-400">{fullShelters}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Total Capacity</div>
-          <div className="text-3xl font-black text-white">8,400</div>
+          <div className="text-3xl font-black text-white">{totalCapacity.toLocaleString()}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Current Occupancy</div>
-          <div className="text-3xl font-black text-white">5,120</div>
+          <div className="text-3xl font-black text-white">{currentOccupancy.toLocaleString()}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="text-xs font-semibold text-slate-400 mb-1">Available Spaces</div>
-          <div className="text-3xl font-black text-blue-400">3,280</div>
+          <div className="text-3xl font-black text-blue-400">{availableSpaces.toLocaleString()}</div>
         </div>
       </div>
 
@@ -98,6 +563,10 @@ export default function ShelterPage() {
                 <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
                   All Status
                 </button>
+                <button onClick={() => { setShowAddModal(true); setEditingShelterId(null); setNewShelter({name: '', capacity: '', averageFamilySize: '4', contactPhone: '', contactPerson: '', facilities: ''}); setSelectedLocation(null); }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add Shelter
+                </button>
               </div>
             </div>
 
@@ -105,108 +574,106 @@ export default function ShelterPage() {
               <table className="w-full text-sm text-left min-w-[700px]">
                 <thead>
                   <tr className="text-xs text-slate-400 border-b border-slate-800 uppercase">
-                    <th className="pb-3 font-semibold">Shelter ID / Name</th>
-                    <th className="pb-3 font-semibold">Location</th>
-                    <th className="pb-3 font-semibold">Distance</th>
-                    <th className="pb-3 font-semibold">Occupancy</th>
-                    <th className="pb-3 font-semibold">Capacity</th>
-                    <th className="pb-3 font-semibold">Status</th>
-                    <th className="pb-3 font-semibold text-right">Action</th>
+                    <th className="pb-3 px-4 font-semibold">Shelter ID / Name</th>
+                    <th className="pb-3 px-4 font-semibold">Location</th>
+                    <th className="pb-3 px-4 font-semibold">Distance</th>
+                    <th className="pb-3 px-4 font-semibold text-center">Occupancy</th>
+                    <th className="pb-3 px-4 font-semibold text-center">Capacity</th>
+                    <th className="pb-3 px-4 font-semibold">Status</th>
+                    <th className="pb-3 px-4 font-semibold text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  <tr className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-white">SH-001 - Central High School</td>
-                    <td className="py-4 text-slate-400">Colombo 07</td>
-                    <td className="py-4 text-slate-400">0.8 km</td>
-                    <td className="py-4 text-white">185</td>
-                    <td className="py-4 text-white">200</td>
-                    <td className="py-4 font-bold text-orange-400">NEAR CAPACITY</td>
-                    <td className="py-4 text-right">
-                      <button className="bg-slate-800 border border-slate-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">
-                        Allocate
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-white opacity-50">SH-004 - St. Peters Community Hall</td>
-                    <td className="py-4 text-slate-400 opacity-50">Dehiwala</td>
-                    <td className="py-4 text-slate-400 opacity-50">2.3 km</td>
-                    <td className="py-4 text-white opacity-50">200</td>
-                    <td className="py-4 text-white opacity-50">200</td>
-                    <td className="py-4 font-bold text-red-500 opacity-50">FULL</td>
-                    <td className="py-4 text-right">
-                      <button className="bg-slate-900 border border-slate-800 text-slate-600 px-4 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed">
-                        Full
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-white">SH-009 - Buddhist Center</td>
-                    <td className="py-4 text-slate-400">Nugegoda</td>
-                    <td className="py-4 text-slate-400">3.1 km</td>
-                    <td className="py-4 text-white">42</td>
-                    <td className="py-4 text-white">150</td>
-                    <td className="py-4 font-bold text-emerald-400">AVAILABLE</td>
-                    <td className="py-4 text-right">
-                      <button className="bg-slate-800 border border-slate-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">
-                        Allocate
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 font-bold text-white">SH-012 - Municipal Stadium</td>
-                    <td className="py-4 text-slate-400">Colombo 03</td>
-                    <td className="py-4 text-slate-400">4.5 km</td>
-                    <td className="py-4 text-white">120</td>
-                    <td className="py-4 text-white">500</td>
-                    <td className="py-4 font-bold text-emerald-400">AVAILABLE</td>
-                    <td className="py-4 text-right">
-                      <button className="bg-slate-800 border border-slate-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">
-                        Allocate
-                      </button>
-                    </td>
-                  </tr>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500">Loading shelters...</td>
+                    </tr>
+                  ) : shelters.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500">No shelters found. Register a new one.</td>
+                    </tr>
+                  ) : shelters.map((shelter) => (
+                    <tr key={shelter._id} onClick={() => setSelectedShelterDetails(shelter)} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
+                      <td className="py-4 px-4 font-bold text-white">{shelter.shelterId} - {shelter.name}</td>
+                      <td className="py-4 px-4 text-slate-400">{shelter.location}</td>
+                      <td className="py-4 px-4 text-slate-400 whitespace-nowrap">
+                        {/* Calculate distance or mock it for now since map logic varies */}
+                        {(Math.random() * 5 + 0.5).toFixed(1)} km
+                      </td>
+                      <td className="py-4 px-4 text-white text-center">{shelter.occupancy}</td>
+                      <td className="py-4 px-4 text-white text-center">{shelter.capacity}</td>
+                      <td className={`py-4 px-4 font-bold whitespace-nowrap ${shelter.status === 'FULL' ? 'text-red-500' : shelter.status === 'NEAR CAPACITY' ? 'text-orange-400' : 'text-emerald-400'}`}>
+                        {shelter.status}
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setAllocatingShelter(shelter); }}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ml-2 ${
+                            shelter.status === 'FULL' 
+                              ? 'bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed'
+                              : 'bg-slate-800 border border-slate-700 text-white hover:bg-slate-700'
+                          }`}
+                        >
+                          {shelter.status === 'FULL' ? 'Full' : 'Allocate'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Capacity Utilization Trends */}
+          {/* Shelter Capacity Status */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-white">Capacity Utilization Trends</h2>
-              <div className="flex items-center gap-4 text-xs font-semibold">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span className="text-slate-300">Current Occupancy</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-slate-700 rounded-full"></div>
-                  <span className="text-slate-500">Total Capacity</span>
-                </div>
-              </div>
+              <h2 className="text-lg font-bold text-white">Shelter Capacity Status</h2>
             </div>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorOccupancy" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="time" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }}
-                    itemStyle={{ color: '#3b82f6' }}
-                  />
-                  <Area type="monotone" dataKey="capacity" stroke="#334155" fill="none" strokeWidth={2} strokeDasharray="5 5" />
-                  <Area type="monotone" dataKey="occupancy" stroke="#3b82f6" fillOpacity={1} fill="url(#colorOccupancy)" strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+              {loading ? (
+                <div className="text-center text-slate-500 py-4">Loading data...</div>
+              ) : shelters.length === 0 ? (
+                <div className="text-center text-slate-500 py-4">No shelters registered.</div>
+              ) : shelters.map((shelter) => {
+                const occupancy = shelter.occupancy || 0;
+                const capacity = shelter.capacity || 1;
+                const percentage = Math.min(Math.round((occupancy / capacity) * 100), 100);
+                const spaceLeft = Math.max(capacity - occupancy, 0);
+                let barColor = "bg-emerald-500";
+                if (percentage >= 100) barColor = "bg-red-500";
+                else if (percentage >= 80) barColor = "bg-orange-500";
+                
+                return (
+                  <div key={shelter._id} className="bg-slate-950 p-4 rounded-xl border border-slate-800/50 hover:border-slate-700 transition-colors">
+                    <div className="flex justify-between items-end mb-3">
+                      <div>
+                        <h3 className="font-bold text-white flex items-center gap-2">
+                          {shelter.name}
+                          <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
+                            {shelter.shelterId}
+                          </span>
+                        </h3>
+                      </div>
+                      <div className="text-xs font-semibold text-right">
+                        {spaceLeft > 0 ? (
+                          <span className="text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-md border border-emerald-400/20">{spaceLeft} SPACES LEFT</span>
+                        ) : (
+                          <span className="text-red-500 bg-red-500/10 px-2 py-1 rounded-md border border-red-500/20">FULL</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="w-full bg-slate-800 rounded-full h-3 mb-2 overflow-hidden shadow-inner">
+                      <div className={`${barColor} h-3 rounded-full transition-all duration-1000 ease-out`} style={{ width: `${percentage}%` }}></div>
+                    </div>
+                    
+                    <div className="flex justify-between text-xs font-mono text-slate-400">
+                      <span>{occupancy} People Present</span>
+                      <span>{capacity} Total Capacity</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -257,9 +724,12 @@ export default function ShelterPage() {
                   value={selectedShelter}
                   onChange={(e) => setSelectedShelter(e.target.value)}
                 >
-                  <option value="SH-001">SH-001 - Central High School (15 spaces left)</option>
-                  <option value="SH-009">SH-009 - Buddhist Center (108 spaces left)</option>
-                  <option value="SH-012">SH-012 - Municipal Stadium (380 spaces left)</option>
+                  {shelters.length === 0 && <option value="">No shelters available</option>}
+                  {shelters.map(s => (
+                    <option key={s._id} value={s.shelterId}>
+                      {s.shelterId} - {s.name} ({Math.max(s.capacity - (s.occupancy || 0), 0)} spaces left)
+                    </option>
+                  ))}
                 </select>
               </div>
               
@@ -269,18 +739,18 @@ export default function ShelterPage() {
                   type="number" 
                   value={evacueeCount}
                   onChange={(e) => setEvacueeCount(e.target.value)}
-                  className={`w-full bg-slate-950 border ${parseInt(evacueeCount) > 15 && selectedShelter === 'SH-001' ? 'border-red-500/50 text-red-400' : 'border-slate-800 text-white'} rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500`}
+                  className={`w-full bg-slate-950 border ${willExceedCapacity ? 'border-red-500/50 text-red-400' : 'border-slate-800 text-white'} rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500`}
                 />
               </div>
 
-              {parseInt(evacueeCount) > 15 && selectedShelter === 'SH-001' && (
+              {willExceedCapacity && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                   <div className="flex gap-2 text-red-400 text-sm font-bold mb-1 items-center">
                     <AlertTriangle className="w-4 h-4" />
                     Capacity Exceeded
                   </div>
                   <div className="text-xs text-red-500/80 leading-relaxed">
-                    Selected shelter only has 15 spaces remaining. Please allocate the remaining {parseInt(evacueeCount) - 15} evacuees to SH-009.
+                    Selected shelter only has {selectedSpacesLeft} spaces remaining. Please allocate the remaining {countToAllocate - selectedSpacesLeft} evacuees to another shelter.
                   </div>
                 </div>
               )}
@@ -289,27 +759,30 @@ export default function ShelterPage() {
                 <button className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
                   Cancel
                 </button>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
-                  {parseInt(evacueeCount) > 15 && selectedShelter === 'SH-001' ? "Allocate 15 Only" : "Allocate"}
+                <button 
+                  onClick={handleBulkAllocate}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors"
+                >
+                  {willExceedCapacity ? `Allocate ${selectedSpacesLeft} Only` : "Allocate"}
                 </button>
               </div>
             </div>
           </div>
 
           {/* Shelter Proximity Map */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col h-[500px]">
             <h2 className="text-lg font-bold text-white mb-4">Shelter Proximity Map</h2>
-            <div className="bg-slate-800 rounded-xl h-48 relative overflow-hidden flex items-center justify-center">
-              <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#475569 1px, transparent 1px)', backgroundSize: '15px 15px' }}></div>
-              <div className="absolute top-3 right-3 bg-slate-900/90 border border-slate-700 rounded-lg p-2 text-[10px] font-semibold text-slate-300 space-y-1.5 z-10">
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Available</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Near Capacity</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div> Full</div>
+            <div className="flex-1 bg-slate-950 border border-slate-800 rounded-xl relative overflow-hidden">
+              <SheltersMap shelters={shelters} />
+              
+              <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-sm border border-slate-700 rounded-lg p-3 text-[10px] font-semibold text-slate-300 space-y-2 z-[400] shadow-xl">
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Available</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> Near Capacity</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div> Full</div>
               </div>
-              <div className="absolute bottom-3 left-3 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded text-[10px] font-bold text-slate-400 z-10">
+              <div className="absolute bottom-4 left-4 bg-slate-900/90 backdrop-blur-sm border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-400 z-[400] shadow-xl">
                 Radius: 5.0 km
               </div>
-              <span className="text-slate-500 font-medium text-sm z-0">Interactive Map View Placeholder</span>
             </div>
           </div>
 

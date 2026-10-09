@@ -1,10 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MapPin, AlertTriangle, Save, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const MapSelector = dynamic(() => import("@/components/MapSelector"), { ssr: false });
+
+interface Shelter {
+  _id: string;
+  shelterId: string;
+  name: string;
+  location: string;
+  capacity: number;
+  occupancy: number;
+  status: string;
+}
 
 export default function EvacueePage() {
   const [formData, setFormData] = useState({
@@ -13,6 +23,7 @@ export default function EvacueePage() {
     householdSize: 1,
     vulnerability: "",
     originAddress: "",
+    contactNumber: "",
     gpsStatus: "40.7128° N, 74.0060° W (Active)"
   });
 
@@ -25,6 +36,93 @@ export default function EvacueePage() {
 
   const [householdMembers, setHouseholdMembers] = useState<{name: string, age: number | "", details: string}[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [evacuees, setEvacuees] = useState<any[]>([]);
+  const [saturationPercentage, setSaturationPercentage] = useState(0);
+  const [resourcesDeployedPercentage, setResourcesDeployedPercentage] = useState(0);
+  
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [isDispatching, setIsDispatching] = useState(false);
+
+  const handleDispatchAlert = async () => {
+    if (!alertMessage) return;
+    setIsDispatching(true);
+    try {
+      const res = await fetch("/api/evacuees/dispatch-alert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: alertMessage })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Successfully dispatched alert to ${data.count} registered evacuees.`);
+        setIsAlertModalOpen(false);
+        setAlertMessage("");
+      } else {
+        alert("Failed to dispatch alert.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error dispatching alert.");
+    } finally {
+      setIsDispatching(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const [sheltersRes, teamsRes] = await Promise.all([
+        fetch("/api/shelters"),
+        fetch("/api/rescue-teams")
+      ]);
+      
+      if (sheltersRes.ok) {
+        const data = await sheltersRes.json();
+        const shelters = data.shelters || [];
+        let totalCapacity = 0;
+        let totalOccupancy = 0;
+        shelters.forEach((s: any) => {
+          totalCapacity += s.capacity || 0;
+          totalOccupancy += s.occupancy || 0;
+        });
+        if (totalCapacity > 0) {
+          setSaturationPercentage(Math.round((totalOccupancy / totalCapacity) * 100));
+        } else {
+          setSaturationPercentage(0);
+        }
+      }
+
+      if (teamsRes.ok) {
+        const teams = await teamsRes.json();
+        const totalTeams = teams.length;
+        const deployedTeams = teams.filter((t: any) => !t.isAvailable || t.assignedIncident).length;
+        if (totalTeams > 0) {
+          setResourcesDeployedPercentage(Math.round((deployedTeams / totalTeams) * 100));
+        } else {
+          setResourcesDeployedPercentage(0);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    }
+  };
+
+  const fetchEvacuees = async () => {
+    try {
+      const res = await fetch("/api/evacuees");
+      const data = await res.json();
+      if (res.ok) {
+        setEvacuees(data.evacuees || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch evacuees:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvacuees();
+    fetchStats();
+  }, []);
 
   const handleHouseholdSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const size = parseInt(e.target.value) || 1;
@@ -106,9 +204,11 @@ export default function EvacueePage() {
           householdSize: 1,
           vulnerability: "",
           originAddress: "",
+          contactNumber: "",
           gpsStatus: "40.7128° N, 74.0060° W (Active)"
         });
         setHouseholdMembers([]);
+        fetchEvacuees();
       } else {
         const errorData = await res.json();
         alert(errorData.error || "Failed to register.");
@@ -132,21 +232,19 @@ export default function EvacueePage() {
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-right text-xs text-slate-400">
-            <div>Last Updated</div>
-            <div className="font-mono font-bold text-slate-300">14:22:05 UTC</div>
-          </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-bold transition-colors">
+          <button 
+            onClick={() => setIsAlertModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-bold transition-colors"
+          >
             Dispatch Alert
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Registration Details */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        {/* Registration Details */}
+        <div className="lg:col-span-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 h-full">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-white">Registration Details</h2>
               <span className="text-sm font-mono text-slate-400">New Registration</span>
@@ -199,15 +297,27 @@ export default function EvacueePage() {
                     />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Origin Address</label>
-                  <textarea 
-                    rows={2} 
-                    value={formData.originAddress}
-                    onChange={(e) => setFormData({...formData, originAddress: e.target.value})}
-                    placeholder="Enter origin address" 
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
-                  ></textarea>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-400 uppercase">Contact Number</label>
+                    <input 
+                      type="text" 
+                      value={formData.contactNumber}
+                      onChange={(e) => setFormData({...formData, contactNumber: e.target.value})}
+                      placeholder="e.g., 077 123 4567" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-400 uppercase">Origin Address</label>
+                    <textarea 
+                      rows={1} 
+                      value={formData.originAddress}
+                      onChange={(e) => setFormData({...formData, originAddress: e.target.value})}
+                      placeholder="Enter origin address" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
+                    ></textarea>
+                  </div>
                 </div>
                 
                 {/* Dynamic Fields for other household members */}
@@ -218,7 +328,7 @@ export default function EvacueePage() {
                       {householdMembers.map((member, idx) => (
                         <div key={idx} className="bg-slate-950/50 border border-slate-800 rounded-lg p-3 space-y-3">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-500">Member {idx + 1}</span>
+                             <span className="text-xs font-bold text-slate-500">Member {idx + 1}</span>
                           </div>
                           <div className="grid grid-cols-3 gap-3">
                             <div className="col-span-2">
@@ -314,67 +424,14 @@ export default function EvacueePage() {
               </div>
             </div>
           </div>
-
-          {/* Recommended Shelter Options */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-x-auto">
-            <div className="flex justify-between items-center mb-6 min-w-max gap-4">
-              <h2 className="text-lg font-bold text-white">Recommended Shelter Options</h2>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Near Me</button>
-                <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Medical Ready</button>
-              </div>
-            </div>
-
-            <table className="w-full text-sm text-left min-w-[600px]">
-              <thead>
-                <tr className="text-xs text-slate-400 border-b border-slate-800">
-                  <th className="pb-3 font-semibold">Shelter Name</th>
-                  <th className="pb-3 font-semibold">Distance</th>
-                  <th className="pb-3 font-semibold">Capacity</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                  <th className="pb-3 font-semibold text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                <tr className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-4 font-bold text-white">Grand Plaza Arena</td>
-                  <td className="py-4 text-slate-300">1.2 km</td>
-                  <td className="py-4 text-slate-300">88% (High)</td>
-                  <td className="py-4 font-bold text-orange-400">WARNING</td>
-                  <td className="py-4 text-right">
-                    <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-500 transition-colors">ALLOCATE</button>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-4 font-bold text-white">Riverside High Gym</td>
-                  <td className="py-4 text-slate-300">2.8 km</td>
-                  <td className="py-4 text-slate-300">62% (Stable)</td>
-                  <td className="py-4 font-bold text-emerald-400">STABLE</td>
-                  <td className="py-4 text-right">
-                    <button className="bg-slate-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-600 transition-colors">SELECT</button>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-4 font-bold text-white">St. Jude Community Center</td>
-                  <td className="py-4 text-slate-300">4.1 km</td>
-                  <td className="py-4 text-slate-300">94% (Full)</td>
-                  <td className="py-4 font-bold text-red-400">CRITICAL</td>
-                  <td className="py-4 text-right">
-                    <button className="bg-slate-800 text-slate-500 border border-slate-700 px-4 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed">FULL</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-6">
-          {/* Allocation Summary */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center">
+        {/* Allocation Summary */}
+        <div className="lg:col-span-1">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center h-full flex flex-col justify-center">
             <h2 className="text-left text-lg font-bold text-white mb-6">Allocation Summary</h2>
             
-            <div className="relative w-32 h-32 mx-auto mb-4">
+            <div className="relative w-40 h-40 mx-auto mb-6 mt-4">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                 <path
                   className="text-slate-800"
@@ -385,77 +442,70 @@ export default function EvacueePage() {
                 />
                 <path
                   className="text-blue-500"
-                  strokeDasharray="92, 100"
+                  strokeDasharray={`${saturationPercentage}, 100`}
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="4"
+                  style={{ transition: "stroke-dasharray 0.5s ease" }}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-black text-white">92%</span>
+                <span className="text-4xl font-black text-white">{saturationPercentage}%</span>
               </div>
             </div>
             <p className="text-xs text-slate-400 mb-8">Total District Saturation</p>
 
-            <div className="text-left">
+            <div className="text-left mt-6">
               <div className="flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase">
                 <span>Resources Deployed</span>
-                <span className="text-white">84%</span>
+                <span className="text-white">{resourcesDeployedPercentage}%</span>
               </div>
               <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: '84%' }}></div>
+                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${resourcesDeployedPercentage}%`, transition: "width 0.5s ease" }}></div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Audit & Activity Log */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col">
-            <h2 className="text-lg font-bold text-white mb-6">Audit & Activity Log</h2>
-            
-            <div className="flex-1 space-y-6 relative before:absolute before:inset-0 before:ml-2 md:before:ml-[5px] before:-translate-x-px before:h-full before:w-0.5 before:bg-slate-800">
-              
-              <div className="relative flex items-start gap-4">
-                <div className="flex items-center justify-center w-3 h-3 mt-1.5 rounded-full border border-slate-900 bg-blue-500 relative z-10 shrink-0"></div>
-                <div>
-                  <div className="text-sm font-bold text-white">Case Opened</div>
-                  <div className="text-xs text-slate-400 mt-0.5">14:15:22 - Officer J. Smith</div>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="flex items-center justify-center w-3 h-3 mt-1.5 rounded-full border border-slate-900 bg-blue-500 relative z-10 shrink-0"></div>
-                <div>
-                  <div className="text-sm font-bold text-white">GPS Coordinates Synced</div>
-                  <div className="text-xs text-slate-400 mt-0.5">14:16:05 - System Auto</div>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="flex items-center justify-center w-3 h-3 mt-1.5 rounded-full border border-slate-900 bg-red-500 relative z-10 shrink-0"></div>
-                <div>
-                  <div className="text-sm font-bold text-red-400">Medical Alert Flagged</div>
-                  <div className="text-xs text-slate-400 mt-0.5">14:18:40 - Data Validation</div>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="flex items-center justify-center w-3 h-3 mt-1.5 rounded-full border border-slate-900 bg-slate-600 relative z-10 shrink-0"></div>
-                <div>
-                  <div className="text-sm font-medium text-slate-500">Pending Allocation...</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-3">
-              <button className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl text-sm hover:bg-blue-700 transition-colors">
-                CONFIRM ALLOCATION
-              </button>
-              <button className="w-full bg-slate-800 border border-slate-700 text-white font-bold py-3 rounded-xl text-sm hover:bg-slate-700 transition-colors">
-                SAVE DRAFT
-              </button>
+      {/* Registered Family List */}
+      <div className="w-full">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-x-auto">
+          <div className="flex justify-between items-center mb-6 min-w-max gap-4">
+            <h2 className="text-lg font-bold text-white">Registered Family List</h2>
+            <div className="flex gap-2">
+              <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Recent</button>
+              <button className="px-3 py-1 text-xs font-semibold bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">Vulnerable</button>
             </div>
           </div>
+
+          <table className="w-full text-sm text-left min-w-[600px]">
+            <thead>
+              <tr className="text-xs text-slate-400 border-b border-slate-800">
+                <th className="pb-3 font-semibold">Case ID</th>
+                <th className="pb-3 font-semibold">Head of Household</th>
+                <th className="pb-3 font-semibold text-center">Family Size</th>
+                <th className="pb-3 font-semibold">Vulnerability</th>
+                <th className="pb-3 font-semibold">Origin</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {evacuees.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-500">No registered families yet.</td>
+                </tr>
+              ) : evacuees.map(evacuee => (
+                <tr key={evacuee._id} className="hover:bg-slate-800/30 transition-colors">
+                  <td className="py-4 font-bold text-blue-400">{evacuee.caseId}</td>
+                  <td className="py-4 text-white font-bold">{evacuee.headOfHousehold} <span className="text-slate-400 font-normal text-xs">({evacuee.headOfHouseholdAge})</span></td>
+                  <td className="py-4 text-white text-center font-bold">{evacuee.householdSize}</td>
+                  <td className="py-4 text-slate-300">{evacuee.vulnerability || "-"}</td>
+                  <td className="py-4 text-slate-400 truncate max-w-[200px]" title={evacuee.originAddress}>{evacuee.originAddress}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -465,6 +515,44 @@ export default function EvacueePage() {
           onLocationSelect={handleLocationSelect} 
           onClose={() => setIsMapModalOpen(false)} 
         />
+      )}
+
+      {/* Alert Modal */}
+      {isAlertModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <h2 className="text-xl font-bold text-white">Dispatch Emergency Alert</h2>
+            <p className="text-sm text-slate-400">
+              Send an SMS alert to all registered evacuees with contact numbers.
+            </p>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-400 uppercase">Alert Message</label>
+              <textarea 
+                rows={3} 
+                value={alertMessage}
+                onChange={(e) => setAlertMessage(e.target.value)}
+                placeholder="e.g., Evacuate immediately to higher ground." 
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
+              ></textarea>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button 
+                onClick={() => setIsAlertModalOpen(false)}
+                className="px-4 py-2 text-sm font-bold text-slate-300 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDispatchAlert}
+                disabled={isDispatching || !alertMessage}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+              >
+                {isDispatching && <Loader2 className="w-4 h-4 animate-spin" />}
+                Send Alert
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
