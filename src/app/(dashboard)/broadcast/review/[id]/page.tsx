@@ -17,6 +17,7 @@ import {
   Clock,
   Radio,
   FileCheck2,
+  Trash2,
 } from "lucide-react";
 
 interface ReviewPageProps {
@@ -30,6 +31,8 @@ export default function BroadcastReviewDetailPage({ params }: ReviewPageProps) {
   const [warning, setWarning] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [issuing, setIssuing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [error, setError] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [overlapData, setOverlapData] = useState<any>(null);
@@ -106,6 +109,28 @@ export default function BroadcastReviewDetailPage({ params }: ReviewPageProps) {
 
   const handleEditDraft = () => {
     router.push(`/broadcast/create?editDraft=${warning.warningId}`);
+  };
+
+  const handleDiscardDraft = async () => {
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/warnings/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to discard draft warning.");
+        setShowDeleteModal(false);
+        setDeleting(false);
+      } else {
+        router.push("/broadcast/create");
+      }
+    } catch {
+      setError("Network error while discarding draft.");
+      setShowDeleteModal(false);
+      setDeleting(false);
+    }
   };
 
   if (loading) {
@@ -272,6 +297,18 @@ export default function BroadcastReviewDetailPage({ params }: ReviewPageProps) {
             <Save className="w-3.5 h-3.5 text-slate-400" />
             <span>Save as Draft (A2)</span>
           </button>
+
+          {warning.status === "DRAFT" && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-950/40 border border-red-800/60 hover:bg-red-900/40 text-red-400 hover:text-red-300 font-bold text-xs transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+              <span>Discard Draft</span>
+            </button>
+          )}
         </div>
 
         <button
@@ -341,6 +378,51 @@ export default function BroadcastReviewDetailPage({ params }: ReviewPageProps) {
               >
                 <Radio className={`w-3.5 h-3.5 ${issuing ? "animate-spin" : ""}`} />
                 <span>{issuing ? "Dispathing Broadcast..." : "Yes, Authorize Broadcast"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Hard Delete / Discard Draft */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-red-500/40 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl shadow-red-600/20">
+            <div className="flex items-center gap-3 text-red-500">
+              <div className="w-12 h-12 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">
+                  Discard Warning Draft?
+                </h3>
+                <span className="text-xs text-red-400 font-semibold uppercase tracking-wider">
+                  Permanent Hard Delete (CRUD: Delete)
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to permanently discard and delete this warning draft for <strong>{warning.targetArea?.districtName}</strong>? This action cannot be undone and will remove the draft from the database.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="px-4 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs tracking-wide shadow-lg shadow-red-600/40 transition-all"
+              >
+                <Trash2 className={`w-3.5 h-3.5 ${deleting ? "animate-spin" : ""}`} />
+                <span>{deleting ? "Deleting Draft..." : "Yes, Discard Draft"}</span>
               </button>
             </div>
           </div>

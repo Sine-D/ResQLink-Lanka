@@ -18,6 +18,7 @@ import {
   cancelWarning,
   getWarningDeliverySummary,
   OverlappingWarningError,
+  deleteDraft,
 } from "../../lib/services/warningService";
 import * as notificationService from "../../lib/services/notificationService";
 import { createWarningSchema, geoJSONPolygonSchema } from "../../lib/validation/warningSchema";
@@ -185,6 +186,19 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
         (n) => n.warningId?.toString() === query.warningId?.toString()
       );
       return Promise.resolve(found || null);
+    });
+
+    (Warning.deleteOne as jest.Mock).mockImplementation((query: any) => {
+      const idx = mockWarningsStore.findIndex((w) => w.warningId === query.warningId);
+      if (idx >= 0) {
+        mockWarningsStore.splice(idx, 1);
+        return Promise.resolve({ deletedCount: 1 });
+      }
+      return Promise.resolve({ deletedCount: 0 });
+    });
+
+    (NotificationModel.deleteMany as jest.Mock).mockImplementation(() => {
+      return Promise.resolve({ deletedCount: 1 });
     });
   });
 
@@ -729,6 +743,26 @@ describe("UC1: Disaster Warning & Alert Management Service Tests", () => {
       const customErr = new OverlappingWarningError("Overlap detected in Galle", "WARN-GALLE-001");
       expect(customErr.existingWarningId).toBe("WARN-GALLE-001");
       expect(customErr.message).toBe("Overlap detected in Galle");
+    });
+
+    test("6.10 deleteDraft() permanently deletes a DRAFT warning from the database (CRUD: Delete)", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      expect(mockWarningsStore.some((w) => w.warningId === draft.warningId)).toBe(true);
+
+      const result = await deleteDraft(draft.warningId);
+      expect(result).toBe(true);
+      expect(mockWarningsStore.some((w) => w.warningId === draft.warningId)).toBe(false);
+    });
+
+    test("6.11 deleteDraft() rejects deleting an ACTIVE warning and throws InvalidWarningStateError", async () => {
+      const draft = await createDraft(sampleInput, dummyUserId);
+      await issueWarning(draft.warningId);
+
+      await expect(deleteDraft(draft.warningId)).rejects.toThrow(InvalidWarningStateError);
+    });
+
+    test("6.12 deleteDraft() throws WarningNotFoundError for non-existent warning ID", async () => {
+      await expect(deleteDraft("non-existent-draft-id")).rejects.toThrow(WarningNotFoundError);
     });
   });
 });
